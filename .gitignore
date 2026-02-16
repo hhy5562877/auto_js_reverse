@@ -31,6 +31,12 @@ node_modules/
 # MCP 运行时数据 (数据库、模型、归档、Chrome 配置全部在 storage/ 下)
 storage/
 
+# MCP 配置文件 (含敏感 API Key，仅追踪 .template 模板)
+.mcp_config/config.json
+
+# 测试文件
+tests/
+
 # 测试临时文件
 /tmp_test_storage/
 tests/tmp_*/

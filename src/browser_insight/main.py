@@ -159,15 +159,32 @@ async def read_js_file(
     使用流程: 先用 list_captured_files 查看文件列表，再用本工具读取具体文件。
 
     Args:
-        file_path: JS 文件的本地绝对路径（从 list_captured_files 获取）
+        file_path: JS 文件的本地绝对路径（必须来自 list_captured_files 输出）
         url: JS 文件的原始 URL（二选一，优先使用 file_path）
         start_line: 起始行号（从 1 开始，默认 1）
         end_line: 结束行号（不填则读到文件末尾）
     """
     target_path: Optional[Path] = None
 
+    if start_line <= 0:
+        return "❌ start_line 必须大于等于 1。"
+    if end_line is not None and end_line <= 0:
+        return "❌ end_line 必须大于等于 1。"
+    if end_line is not None and end_line < start_line:
+        return "❌ end_line 必须大于等于 start_line。"
+
     if file_path:
-        target_path = Path(file_path)
+        try:
+            candidate = Path(file_path).expanduser().resolve(strict=False)
+        except Exception as e:
+            return f"❌ 文件路径无效: {e}"
+        record = pipeline.index.get_file_by_local_path(str(candidate))
+        if not record or not record.get("local_path"):
+            return (
+                "❌ 安全限制：仅允许读取已归档的 JS 文件。\n"
+                "请先使用 list_captured_files 获取文件路径，再传入 file_path。"
+            )
+        target_path = Path(record["local_path"])
     elif url:
         record = pipeline.index.get_file_by_url(url)
         if record and record.get("local_path"):
@@ -176,6 +193,9 @@ async def read_js_file(
             return f"❌ 未找到 URL 对应的本地文件: {url}\n请先使用 capture_current_page 抓取。"
     else:
         return "❌ 请提供 file_path 或 url 参数。"
+
+    if target_path.suffix.lower() in {".map"}:
+        return "❌ 仅支持读取归档的 JS 源文件，不支持 .map 文件。"
 
     if not target_path.exists():
         return f"❌ 文件不存在: {target_path}"
@@ -187,9 +207,11 @@ async def read_js_file(
 
     all_lines = content.split("\n")
     total = len(all_lines)
+    if start_line > total:
+        return f"❌ start_line 超出文件总行数 ({total})。"
 
-    start = max(1, start_line) - 1
-    end = min(total, end_line) if end_line else total
+    start = start_line - 1
+    end = min(total, end_line) if end_line is not None else total
     selected = all_lines[start:end]
 
     header = f"📄 `{target_path.name}` (行 {start + 1}-{end}/{total})\n"

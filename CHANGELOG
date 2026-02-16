@@ -1,5 +1,44 @@
 # CHANGELOG
 
+- [2026-02-16 23:54] FIX: 修复 CDP fallback 重试跳过可用标签页与 read_js_file 路径归一化异常问题 (Files: src/browser_insight/services/browser_connector.py, src/browser_insight/main.py, CHANGELOG)
+  - connect() 新增 failed_debugger_urls 失败集合，重试时优先选择未失败过的 tab，穷尽后才允许重试历史失败 tab
+  - 修复多标签场景下 A->B->A 的重复尝试问题，避免可用 tab 因重试顺序被跳过
+  - read_js_file 对 Path.resolve(strict=False) 增加异常兜底，非法路径输入返回用户友好错误而非抛出未捕获异常
+- [2026-02-16 19:45] FIX: 修复目标页连接语义回归与行号边界校验问题 (Files: src/browser_insight/services/browser_connector.py, src/browser_insight/main.py, doc/API.md, CHANGELOG)
+  - ensure_connected(target_url) 在连接健康时新增目标页校验，不匹配时会自动导航到目标页面
+  - _check_ws_alive 改为直接发送轻量 CDP ping，不再复用 _send_command，避免健康检查路径触发静默重连到非目标页
+  - read_js_file 补充 start_line/end_line 的正数校验，并在 start_line 超出总行数时返回明确错误
+  - doc/API.md 同步 read_js_file 的行号参数约束（>=1 且 end_line >= start_line）
+- [2026-02-16 18:29] FIX: 按优先级修复本地文件读取安全、路径冲突与查询健壮性问题 (Files: src/browser_insight/main.py, src/browser_insight/services/pipeline.py, src/browser_insight/services/index_manager.py, pyproject.toml, doc/API.md, CHANGELOG)
+  - read_js_file 增加安全边界：仅允许读取已归档且已登记索引的 JS 文件，拒绝任意本地路径与 .map 文件
+  - read_js_file 增加行范围参数校验（end_line 不能小于 start_line）
+  - capture_page 的 URL->本地路径映射增加 query/fragment 变体哈希，避免同路径不同 query 文件互相覆盖
+  - capture_page 全流程增加 finally 清理，任意异常路径都保证执行浏览器断连
+  - IndexManager where 条件统一使用安全字符串转义，修复包含单引号输入导致的查询失效风险
+  - IndexManager 新增 get_file_by_local_path 供 read_js_file 做归档文件白名单校验
+  - pyproject.toml 补充 aiohttp 运行时依赖声明
+  - doc/API.md 同步 read_js_file 安全限制与参数语义
+- [2026-02-16 17:48] FIX: 修复 BrowserConnector 在 websockets 新版本下连接判断异常及目标页回退误判问题 (Files: src/browser_insight/services/browser_connector.py, CHANGELOG)
+  - is_connected/_check_ws_alive 改为使用兼容性状态判断，不再直接访问已在新版本中移除的 `self._ws.open`
+  - 新增 _is_ws_open()，兼容 `state`(websockets>=14) 与 `open/closed`(legacy) 两类连接对象
+  - connect() 目标页导航判定改为基于当前实际连接 tab URL，避免 fallback 后复用旧 tabs 快照导致跳过导航
+  - 抽取 _url_matches_target() 统一 URL 匹配逻辑，减少目标页匹配分支重复
+  - 通过本地内联回归脚本验证 state 型 WebSocket 兼容和 fallback tab 重新导航场景
+- [2026-02-16 17:31] FIX: 增强 CDP 连接健壮性，解决连接超时和断线后无法恢复的问题 (Files: src/browser_insight/services/browser_connector.py, src/browser_insight/services/pipeline.py)
+  - connect() 前先清理旧 WebSocket 连接，避免残留连接阻塞新连接
+  - is_connected 改为检查 WebSocket 实际 open 状态，而非仅判断对象是否存在
+  - 新增 _check_ws_alive() 健康检查，ensure_connected 时通过发送轻量 CDP 命令验证连接可用性
+  - _ws_reader_loop 中 set_result 增加 Future 状态检查，防止 InvalidStateError
+  - _ws_reader_loop 增加 JSON 解析容错，非 JSON 消息不再导致 reader 崩溃
+  - _ws_connect 增加 10 秒连接超时，避免 WebSocket 握手无限等待
+  - _send_command 断线重连后检查 WebSocket 状态，重连失败时抛出明确异常
+  - _fetch_all_tabs 增加 3 次重试（间隔 1 秒），错误信息包含原始异常
+  - connect() 重试时自动尝试备选标签页，WebSocket 被占用时切换到其他可用 tab
+  - connect() 重试异常类型新增 asyncio.TimeoutError 捕获
+  - navigate() 改为等待 Page.loadEventFired 事件，替代固定 sleep
+  - disconnect() 增加 close 超时保护（3 秒）和 pending Future 取消
+  - Pipeline.capture_page 改用 ensure_connected 替代 connect，支持连接复用
+  - Pipeline.capture_page/shutdown 中 disconnect 增加异常保护，避免断线后报错
 - [2026-02-16 17:02] FIX: 修复 OpenCode MCP 配置示例与新版 schema 不兼容导致启动报错的问题 (Files: README.md, CHANGELOG)
   - OpenCode 配置从旧版 `mcpServers + type=stdio + args + env[]` 更新为 `mcp + type=local + command[] + environment{}`
   - 文档补充 OpenCode 1.2+ 的字段约束，避免出现 `Invalid input mcp.browser-insight`

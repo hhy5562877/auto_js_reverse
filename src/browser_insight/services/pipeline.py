@@ -78,121 +78,143 @@ class Pipeline:
         storage_path: Optional[str] = None,
         target_url: Optional[str] = None,
     ) -> dict[str, Any]:
-        await self._browser.connect(target_url=target_url)
-        current_url = await self._browser.get_current_url()
-        domain = BrowserConnector.extract_domain(current_url)
-        timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        try:
+            await self._browser.ensure_connected(target_url=target_url)
+            current_url = await self._browser.get_current_url()
+            domain = BrowserConnector.extract_domain(current_url)
+            timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-        if storage_path:
-            base_storage = Path(storage_path)
-        else:
-            base_storage = self._storage_dir
+            if storage_path:
+                base_storage = Path(storage_path)
+            else:
+                base_storage = self._storage_dir
 
-        session_dir = base_storage / timestamp / domain
-        session_dir.mkdir(parents=True, exist_ok=True)
+            session_dir = base_storage / timestamp / domain
+            session_dir.mkdir(parents=True, exist_ok=True)
 
-        html = await self._browser.get_document_html()
-        (session_dir / "index.html").write_text(html, encoding="utf-8")
+            html = await self._browser.get_document_html()
+            (session_dir / "index.html").write_text(html, encoding="utf-8")
 
-        scripts = await self._browser.get_all_scripts()
-        logger.info("发现 %d 个脚本标签 (域名: %s)", len(scripts), domain)
+            scripts = await self._browser.get_all_scripts()
+            logger.info("发现 %d 个脚本标签 (域名: %s)", len(scripts), domain)
 
-        semaphore = asyncio.Semaphore(self._max_concurrent)
-        stats = {
-            "new_files": 0,
-            "skipped": 0,
-            "source_maps": 0,
-            "chunks_indexed": 0,
-            "storage_path": str(session_dir),
-        }
+            semaphore = asyncio.Semaphore(self._max_concurrent)
+            stats = {
+                "new_files": 0,
+                "skipped": 0,
+                "source_maps": 0,
+                "chunks_indexed": 0,
+                "storage_path": str(session_dir),
+            }
 
-        tasks_to_parse: list[dict[str, str]] = []
+            tasks_to_parse: list[dict[str, str]] = []
 
-        def _url_to_local_path(src_url: str) -> Path:
-            parsed = urlparse(src_url)
-            url_path = parsed.path.lstrip("/")
-            if not url_path:
-                url_path = "index.js"
-            return session_dir / url_path
+            def _url_to_local_path(src_url: str) -> Path:
+                parsed = urlparse(src_url)
+                url_path = parsed.path.lstrip("/")
+                if not url_path:
+                    url_path = "index.js"
 
-        async def process_script(script_info: dict) -> None:
-            src_url = script_info.get("src", "")
-            if not src_url:
-                return
+                local_path = session_dir / url_path
+                variant = parsed.query
+                if parsed.fragment:
+                    variant = f"{variant}#{parsed.fragment}" if variant else parsed.fragment
+                if variant:
+                    variant_hash = BrowserConnector.compute_hash(
+                        variant.encode("utf-8")
+                    )[:12]
+                    if local_path.suffix:
+                        local_path = local_path.with_name(
+                            f"{local_path.stem}__q_{variant_hash}{local_path.suffix}"
+                        )
+                    else:
+                        local_path = local_path.with_name(
+                            f"{local_path.name}__q_{variant_hash}"
+                        )
 
-            async with semaphore:
-                content = await self._browser.download_resource(src_url)
-                if not content:
+                return local_path
+
+            async def process_script(script_info: dict) -> None:
+                src_url = script_info.get("src", "")
+                if not src_url:
                     return
 
-                file_hash = BrowserConnector.compute_hash(content)
+                async with semaphore:
+                    content = await self._browser.download_resource(src_url)
+                    if not content:
+                        return
 
-                if not force_refresh and self._index.hash_exists(src_url, file_hash):
-                    stats["skipped"] += 1
-                    logger.debug("跳过已索引文件: %s", src_url)
-                    return
+                    file_hash = BrowserConnector.compute_hash(content)
 
-                if len(content) > self._max_file_size:
-                    logger.warning(
-                        "超大文件 (%d bytes), 将使用行切分: %s", len(content), src_url
+                    if not force_refresh and self._index.hash_exists(src_url, file_hash):
+                        stats["skipped"] += 1
+                        logger.debug("跳过已索引文件: %s", src_url)
+                        return
+
+                    if len(content) > self._max_file_size:
+                        logger.warning(
+                            "超大文件 (%d bytes), 将使用行切分: %s", len(content), src_url
+                        )
+
+                    local_path = _url_to_local_path(src_url)
+                    local_path.parent.mkdir(parents=True, exist_ok=True)
+                    local_path.write_bytes(content)
+
+                    map_path: Optional[str] = None
+                    map_url = src_url + ".map"
+                    map_content = await self._browser.download_resource(map_url)
+                    if map_content:
+                        map_local = local_path.with_suffix(".js.map")
+                        map_local.write_bytes(map_content)
+                        map_path = str(map_local)
+                        stats["source_maps"] += 1
+
+                    self._index.add_file_record(
+                        {
+                            "url": src_url,
+                            "hash": file_hash,
+                            "domain": domain,
+                            "local_path": str(local_path),
+                            "map_path": map_path or "",
+                            "source_map_restored": map_path is not None,
+                            "timestamp": datetime.now(timezone.utc).isoformat(),
+                        }
                     )
 
-                local_path = _url_to_local_path(src_url)
-                local_path.parent.mkdir(parents=True, exist_ok=True)
-                local_path.write_bytes(content)
+                    tasks_to_parse.append(
+                        {
+                            "path": str(local_path),
+                            "mapPath": map_path or "",
+                            "url": src_url,
+                        }
+                    )
+                    stats["new_files"] += 1
 
-                map_path: Optional[str] = None
-                map_url = src_url + ".map"
-                map_content = await self._browser.download_resource(map_url)
-                if map_content:
-                    map_local = local_path.with_suffix(".js.map")
-                    map_local.write_bytes(map_content)
-                    map_path = str(map_local)
-                    stats["source_maps"] += 1
+            await asyncio.gather(*[process_script(s) for s in scripts])
 
-                self._index.add_file_record(
-                    {
-                        "url": src_url,
-                        "hash": file_hash,
-                        "domain": domain,
-                        "local_path": str(local_path),
-                        "map_path": map_path or "",
-                        "source_map_restored": map_path is not None,
-                        "timestamp": datetime.now(timezone.utc).isoformat(),
-                    }
-                )
+            if tasks_to_parse:
+                chunks_indexed = await self._parse_and_index(tasks_to_parse, domain)
+                stats["chunks_indexed"] = chunks_indexed
 
-                tasks_to_parse.append(
-                    {
-                        "path": str(local_path),
-                        "mapPath": map_path or "",
-                        "url": src_url,
-                    }
-                )
-                stats["new_files"] += 1
+            metadata = {
+                "url": current_url,
+                "domain": domain,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "storage_path": str(session_dir),
+                "stats": stats,
+            }
 
-        await asyncio.gather(*[process_script(s) for s in scripts])
+            (session_dir / "metadata.json").write_text(
+                json.dumps(metadata, ensure_ascii=False, indent=2),
+                encoding="utf-8",
+            )
 
-        if tasks_to_parse:
-            chunks_indexed = await self._parse_and_index(tasks_to_parse, domain)
-            stats["chunks_indexed"] = chunks_indexed
-
-        await self._browser.disconnect()
-
-        metadata = {
-            "url": current_url,
-            "domain": domain,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "storage_path": str(session_dir),
-            "stats": stats,
-        }
-
-        (session_dir / "metadata.json").write_text(
-            json.dumps(metadata, ensure_ascii=False, indent=2),
-            encoding="utf-8",
-        )
-
-        return stats
+            return stats
+        finally:
+            try:
+                await self._browser.disconnect()
+            except Exception as e:
+                logger.debug("capture_page 清理浏览器连接失败: %s", e)
 
     async def _parse_and_index(self, files: list[dict[str, str]], domain: str) -> int:
         await self._node_bridge.start()
@@ -267,5 +289,8 @@ class Pipeline:
 
     async def shutdown(self) -> None:
         await self._node_bridge.stop()
-        await self._browser.disconnect()
+        try:
+            await self._browser.disconnect()
+        except Exception:
+            pass
         self._browser.shutdown_chrome()

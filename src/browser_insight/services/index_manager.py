@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import warnings
+from pathlib import Path
 from typing import Optional
 
 import lancedb
@@ -62,16 +63,26 @@ class IndexManager:
                 schema=CODE_CHUNKS_SCHEMA,
             )
 
+    @staticmethod
+    def _quote_filter_value(value: str) -> str:
+        # DataFusion SQL 字符串字面量需要把单引号转义成两个单引号。
+        return "'" + value.replace("'", "''") + "'"
+
+    def _eq_filter(self, field: str, value: str) -> str:
+        return f"{field} = {self._quote_filter_value(value)}"
+
     def hash_exists(self, url: str, file_hash: str) -> bool:
         try:
+            expr = f"{self._eq_filter('url', url)} AND {self._eq_filter('hash', file_hash)}"
             results = (
                 self._file_index.search()
-                .where(f"url = '{url}' AND hash = '{file_hash}'")
+                .where(expr)
                 .limit(1)
                 .to_list()
             )
             return len(results) > 0
-        except Exception:
+        except Exception as e:
+            logger.debug("hash_exists 查询失败 (url=%s): %s", url, e)
             return False
 
     def add_file_record(self, record: dict) -> None:
@@ -90,7 +101,7 @@ class IndexManager:
     ) -> list[dict]:
         search = self._code_chunks.search(query_vector).metric("cosine").limit(limit)
         if domain_filter:
-            search = search.where(f"domain = '{domain_filter}'")
+            search = search.where(self._eq_filter("domain", domain_filter))
         return search.to_list()
 
     def list_domains(self) -> list[dict]:
@@ -124,8 +135,9 @@ class IndexManager:
 
     def delete_by_domain(self, domain: str) -> None:
         try:
-            self._file_index.delete(f"domain = '{domain}'")
-            self._code_chunks.delete(f"domain = '{domain}'")
+            expr = self._eq_filter("domain", domain)
+            self._file_index.delete(expr)
+            self._code_chunks.delete(expr)
         except Exception as e:
             logger.warning("删除域名 %s 数据失败: %s", domain, e)
 
@@ -142,11 +154,38 @@ class IndexManager:
 
     def get_file_by_url(self, url: str) -> Optional[dict]:
         try:
-            results = (
-                self._file_index.search().where(f"url = '{url}'").limit(1).to_list()
-            )
+            results = self._file_index.search().where(
+                self._eq_filter("url", url)
+            ).limit(1).to_list()
             return results[0] if results else None
-        except Exception:
+        except Exception as e:
+            logger.debug("get_file_by_url 查询失败 (url=%s): %s", url, e)
+            return None
+
+    def get_file_by_local_path(self, local_path: str) -> Optional[dict]:
+        try:
+            results = self._file_index.search().where(
+                self._eq_filter("local_path", local_path)
+            ).limit(1).to_list()
+            if results:
+                return results[0]
+
+            target = Path(local_path).expanduser().resolve(strict=False)
+            for record in self.list_files_by_domain():
+                candidate = record.get("local_path", "")
+                if not candidate:
+                    continue
+                try:
+                    if (
+                        Path(candidate).expanduser().resolve(strict=False)
+                        == target
+                    ):
+                        return record
+                except Exception:
+                    continue
+            return None
+        except Exception as e:
+            logger.debug("get_file_by_local_path 查询失败 (path=%s): %s", local_path, e)
             return None
 
     def search_chunks_by_text(

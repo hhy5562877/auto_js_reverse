@@ -66,8 +66,14 @@ def _find_chrome_binary() -> Optional[str]:
 def _no_proxy_env() -> dict[str, str]:
     env = os.environ.copy()
     for key in (
-        "ALL_PROXY", "all_proxy", "HTTPS_PROXY", "https_proxy",
-        "HTTP_PROXY", "http_proxy", "SOCKS_PROXY", "socks_proxy",
+        "ALL_PROXY",
+        "all_proxy",
+        "HTTPS_PROXY",
+        "https_proxy",
+        "HTTP_PROXY",
+        "http_proxy",
+        "SOCKS_PROXY",
+        "socks_proxy",
     ):
         env.pop(key, None)
     env["NO_PROXY"] = "localhost,127.0.0.1"
@@ -123,11 +129,18 @@ class BrowserConnector:
                 try:
                     raw = await self._ws.recv()
                 except ConnectionClosed:
+                    logger.warning("WebSocket 连接已关闭，reader 退出")
                     break
-                msg = json.loads(raw)
+                try:
+                    msg = json.loads(raw)
+                except json.JSONDecodeError:
+                    logger.debug("收到非 JSON 消息，跳过")
+                    continue
                 msg_id = msg.get("id")
                 if msg_id is not None and msg_id in self._pending_commands:
-                    self._pending_commands[msg_id].set_result(msg)
+                    fut = self._pending_commands[msg_id]
+                    if not fut.done():
+                        fut.set_result(msg)
                 elif "method" in msg:
                     try:
                         self._event_queue.put_nowait(msg)
@@ -138,6 +151,7 @@ class BrowserConnector:
 
     async def _is_cdp_available(self) -> bool:
         import aiohttp
+
         url = f"http://{self._host}:{self._port}/json"
         try:
             connector = aiohttp.TCPConnector(force_close=True)
@@ -190,51 +204,73 @@ class BrowserConnector:
 
     async def _fetch_all_tabs(self) -> list[dict]:
         import aiohttp
+
         url = f"http://{self._host}:{self._port}/json"
-        try:
-            connector = aiohttp.TCPConnector(force_close=True)
-            async with aiohttp.ClientSession(
-                connector=connector, trust_env=False
-            ) as session:
-                async with session.get(
-                    url, timeout=aiohttp.ClientTimeout(total=5)
-                ) as resp:
-                    return await resp.json()
-        except Exception:
-            raise ConnectionRefusedError(
-                f"无法连接到 Chrome DevTools (http://{self._host}:{self._port})。"
-            )
+        last_err: Optional[Exception] = None
+        for attempt in range(3):
+            try:
+                connector = aiohttp.TCPConnector(force_close=True)
+                async with aiohttp.ClientSession(
+                    connector=connector, trust_env=False
+                ) as session:
+                    async with session.get(
+                        url, timeout=aiohttp.ClientTimeout(total=5)
+                    ) as resp:
+                        return await resp.json()
+            except Exception as e:
+                last_err = e
+                if attempt < 2:
+                    await asyncio.sleep(1)
+        raise ConnectionRefusedError(
+            f"无法连接到 Chrome DevTools (http://{self._host}:{self._port}): {last_err}"
+        )
+
+    @staticmethod
+    def _url_matches_target(page_url: str, target_url: str) -> bool:
+        page_parsed = urlparse(page_url or "")
+        target_parsed = urlparse(target_url)
+        target_domain = target_parsed.netloc.lower()
+        target_path = target_parsed.path.rstrip("/")
+        page_domain = page_parsed.netloc.lower()
+        page_path = page_parsed.path.rstrip("/")
+
+        if target_domain != page_domain:
+            return False
+
+        return (
+            not target_path
+            or target_path == "/"
+            or page_path.startswith(target_path)
+        )
 
     def _match_tab(self, tabs: list[dict], target_url: str) -> Optional[dict]:
         target_parsed = urlparse(target_url)
         target_domain = target_parsed.netloc.lower()
-        target_path = target_parsed.path.rstrip("/")
+        if not target_domain:
+            return None
 
         for tab in tabs:
             if tab.get("type") != "page" or "webSocketDebuggerUrl" not in tab:
                 continue
             tab_url = tab.get("url", "")
-            tab_parsed = urlparse(tab_url)
-            tab_domain = tab_parsed.netloc.lower()
-            tab_path = tab_parsed.path.rstrip("/")
-
-            if target_domain == tab_domain:
-                if (
-                    not target_path
-                    or target_path == "/"
-                    or tab_path.startswith(target_path)
-                ):
-                    return tab
+            if self._url_matches_target(tab_url, target_url):
+                return tab
 
         return None
 
     async def _ws_connect(self, debugger_url: str) -> None:
-        self._ws = await websockets.connect(
-            debugger_url,
-            max_size=50 * 1024 * 1024,
-            additional_headers={"Host": f"{self._host}:{self._port}"},
-            proxy=None,
-        )
+        try:
+            self._ws = await asyncio.wait_for(
+                websockets.connect(
+                    debugger_url,
+                    max_size=50 * 1024 * 1024,
+                    additional_headers={"Host": f"{self._host}:{self._port}"},
+                    proxy=None,
+                ),
+                timeout=10.0,
+            )
+        except asyncio.TimeoutError:
+            raise ConnectionRefusedError(f"WebSocket 连接超时 (10s): {debugger_url}")
         self._pending_commands.clear()
         while not self._event_queue.empty():
             try:
@@ -267,6 +303,9 @@ class BrowserConnector:
         raise RuntimeError("Chrome 已启动但 CDP 端口未就绪，请检查端口是否被占用。")
 
     async def connect(self, target_url: Optional[str] = None) -> None:
+        if self._ws:
+            await self.disconnect()
+
         await self._ensure_cdp_available()
 
         tabs = await self._fetch_all_tabs()
@@ -289,6 +328,11 @@ class BrowserConnector:
         self._debugger_url = selected_tab["webSocketDebuggerUrl"]
         self._connected_tab_url = selected_tab.get("url", "")
 
+        available_tabs = [
+            t for t in tabs if t.get("type") == "page" and "webSocketDebuggerUrl" in t
+        ]
+        failed_debugger_urls: set[str] = set()
+
         for attempt in range(self._max_reconnect):
             try:
                 await self._ws_connect(self._debugger_url)
@@ -298,37 +342,157 @@ class BrowserConnector:
                     self._connected_tab_url,
                 )
                 break
-            except (ConnectionRefusedError, OSError, InvalidURI, ImportError) as e:
+            except (
+                ConnectionRefusedError,
+                OSError,
+                InvalidURI,
+                ImportError,
+                asyncio.TimeoutError,
+            ) as e:
                 logger.warning(
                     "CDP WebSocket 连接失败 (尝试 %d/%d): %s",
-                    attempt + 1, self._max_reconnect, e,
+                    attempt + 1,
+                    self._max_reconnect,
+                    e,
                 )
                 if attempt < self._max_reconnect - 1:
+                    failed_debugger_urls.add(self._debugger_url)
+                    fallback = None
+                    for t in available_tabs:
+                        candidate_ws_url = t["webSocketDebuggerUrl"]
+                        if (
+                            candidate_ws_url != self._debugger_url
+                            and candidate_ws_url not in failed_debugger_urls
+                        ):
+                            fallback = t
+                            break
+                    if fallback is None:
+                        # 未失败 tab 已穷尽后，才允许重试历史失败 tab。
+                        for t in available_tabs:
+                            if t["webSocketDebuggerUrl"] != self._debugger_url:
+                                fallback = t
+                                break
+                    if fallback:
+                        logger.info("尝试备选标签页: %s", fallback.get("url", ""))
+                        self._debugger_url = fallback["webSocketDebuggerUrl"]
+                        self._connected_tab_url = fallback.get("url", "")
                     await asyncio.sleep(self._reconnect_interval)
                 else:
                     raise ConnectionRefusedError(
-                        f"CDP 连接失败，已重试 {self._max_reconnect} 次。"
+                        f"CDP 连接失败，已重试 {self._max_reconnect} 次: {e}"
                     )
 
-        if target_url and not self._match_tab(tabs, target_url):
+        if target_url and not self._url_matches_target(
+            self._connected_tab_url or "", target_url
+        ):
             logger.info("当前标签页非目标页面，导航到: %s", target_url)
             await self.navigate(target_url)
 
-    async def navigate(self, url: str, wait_sec: float = 3.0) -> str:
+    async def navigate(self, url: str, timeout: float = 15.0) -> str:
         await self._send_command("Page.enable")
+        self._drain_events()
         await self._send_command("Page.navigate", {"url": url})
-        await asyncio.sleep(wait_sec)
+
+        end_time = asyncio.get_event_loop().time() + timeout
+        loaded = False
+        while asyncio.get_event_loop().time() < end_time:
+            remaining = end_time - asyncio.get_event_loop().time()
+            if remaining <= 0:
+                break
+            try:
+                event = await asyncio.wait_for(
+                    self._event_queue.get(), timeout=min(remaining, 0.5)
+                )
+                if event.get("method") == "Page.loadEventFired":
+                    loaded = True
+                    break
+            except asyncio.TimeoutError:
+                continue
+
+        if not loaded:
+            logger.warning("等待页面加载超时 (%.1fs)，继续执行: %s", timeout, url)
+
         current = await self.get_current_url()
         logger.info("已导航到: %s", current)
         return current
 
+    def _is_ws_open(self) -> bool:
+        if not self._ws:
+            return False
+
+        state = getattr(self._ws, "state", None)
+        if state is not None:
+            state_name = getattr(state, "name", None)
+            if isinstance(state_name, str):
+                return state_name.upper() == "OPEN"
+            state_value = getattr(state, "value", None)
+            if isinstance(state_value, int):
+                return state_value == 1
+            if isinstance(state, int):
+                return state == 1
+
+        open_attr = getattr(self._ws, "open", None)
+        if isinstance(open_attr, bool):
+            return open_attr
+
+        closed_attr = getattr(self._ws, "closed", None)
+        if isinstance(closed_attr, bool):
+            return not closed_attr
+
+        return True
+
     @property
     def is_connected(self) -> bool:
-        return self._ws is not None
+        return self._is_ws_open()
+
+    async def _check_ws_alive(self) -> bool:
+        """通过发送一个轻量级 CDP 命令检测 WebSocket 是否真正可用。"""
+        if not self._is_ws_open():
+            return False
+
+        self._msg_id += 1
+        cmd_id = self._msg_id
+        msg = {
+            "id": cmd_id,
+            "method": "Runtime.evaluate",
+            "params": {"expression": "1"},
+        }
+        future: asyncio.Future = asyncio.get_event_loop().create_future()
+        self._pending_commands[cmd_id] = future
+
+        try:
+            await self._ws.send(json.dumps(msg))
+        except asyncio.CancelledError:
+            self._pending_commands.pop(cmd_id, None)
+            raise
+        except Exception:
+            self._pending_commands.pop(cmd_id, None)
+            return False
+        try:
+            resp = await asyncio.wait_for(future, timeout=5.0)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            return False
+        finally:
+            self._pending_commands.pop(cmd_id, None)
+
+        return isinstance(resp, dict) and "error" not in resp
 
     async def ensure_connected(self, target_url: Optional[str] = None) -> None:
-        if not self.is_connected:
-            await self.connect(target_url=target_url)
+        if self.is_connected:
+            if await self._check_ws_alive():
+                if target_url:
+                    current_url = await self.get_current_url()
+                    self._connected_tab_url = current_url
+                    if not self._url_matches_target(current_url, target_url):
+                        logger.info("当前连接页面非目标页面，导航到: %s", target_url)
+                        current_url = await self.navigate(target_url)
+                        self._connected_tab_url = current_url
+                return
+            logger.warning("CDP 连接健康检查失败，重新连接")
+            await self.disconnect()
+        await self.connect(target_url=target_url)
 
     async def _send_command(
         self, method: str, params: dict[str, Any] | None = None
@@ -349,9 +513,13 @@ class BrowserConnector:
             await self._ws.send(json.dumps(msg))
         except ConnectionClosed:
             self._pending_commands.pop(cmd_id, None)
+            logger.warning("发送 CDP 命令时连接已断开，尝试重连: %s", method)
             await self.connect()
             future = asyncio.get_event_loop().create_future()
             self._pending_commands[cmd_id] = future
+            if not self._ws:
+                self._pending_commands.pop(cmd_id, None)
+                raise RuntimeError("CDP 重连失败")
             await self._ws.send(json.dumps(msg))
 
         try:
@@ -468,8 +636,14 @@ class BrowserConnector:
     async def disconnect(self) -> None:
         await self._stop_reader()
         if self._ws:
-            await self._ws.close()
+            try:
+                await asyncio.wait_for(self._ws.close(), timeout=3.0)
+            except Exception:
+                pass
             self._ws = None
+        for fut in self._pending_commands.values():
+            if not fut.done():
+                fut.cancel()
         self._pending_commands.clear()
 
     def shutdown_chrome(self) -> None:
@@ -522,6 +696,7 @@ class BrowserConnector:
     async def download_resource(self, url: str) -> Optional[bytes]:
         try:
             import aiohttp
+
             connector = aiohttp.TCPConnector(force_close=True)
             async with aiohttp.ClientSession(connector=connector) as session:
                 async with session.get(

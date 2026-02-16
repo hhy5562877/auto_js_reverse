@@ -1,5 +1,8 @@
 # CHANGELOG
 
+- [2026-02-16 17:02] FIX: 修复 OpenCode MCP 配置示例与新版 schema 不兼容导致启动报错的问题 (Files: README.md, CHANGELOG)
+  - OpenCode 配置从旧版 `mcpServers + type=stdio + args + env[]` 更新为 `mcp + type=local + command[] + environment{}`
+  - 文档补充 OpenCode 1.2+ 的字段约束，避免出现 `Invalid input mcp.browser-insight`
 - [2026-02-16 16:00] FIX: 修复 Node.js Worker 解析压缩 JS 文件时内存爆炸导致 chunks_indexed=0 的问题 (Files: src/browser_insight/node_worker/processor.js)
   - 根因: 压缩文件(如 main-es5.js 3MB单行)的 AST 节点用行号切片时，每个节点都提取整行(=整个文件)，导致 6552 chunks × 3MB = 18.6GB
   - 修复: 检测压缩文件(平均行长 > 4000 字符)后，使用字符偏移(node.start/node.end)替代行号切片

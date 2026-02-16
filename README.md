@@ -248,30 +248,29 @@ claude mcp add browser-insight \
 
 ### OpenCode
 
-在项目根目录创建 `.opencode.json`（或 `$HOME/.opencode.json` 全局生效）：
+在项目根目录创建 `.opencode.json`（或 `~/.config/opencode/opencode.json` 全局生效）：
 
 ```json
 {
-  "mcpServers": {
+  "mcp": {
     "browser-insight": {
-      "type": "stdio",
-      "command": "uv",
-      "args": [
-        "run",
-        "--directory", "/absolute/path/to/auto_js_reverse",
-        "--python", "3.12",
-        "python", "-m", "browser_insight.main"
+      "type": "local",
+      "command": [
+        "/absolute/path/to/auto_js_reverse/.venv/bin/python",
+        "-m",
+        "browser_insight.main"
       ],
-      "env": [
-        "PYTHONPATH=/absolute/path/to/auto_js_reverse/src",
-        "SILICONFLOW_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx"
-      ]
+      "environment": {
+        "PYTHONPATH": "/absolute/path/to/auto_js_reverse/src",
+        "SILICONFLOW_API_KEY": "sk-xxxxxxxxxxxxxxxxxxxxxxxx"
+      },
+      "enabled": true
     }
   }
 }
 ```
 
-> 注意：OpenCode 的 `env` 字段为字符串数组（`"KEY=VALUE"` 格式），与其他 IDE 的对象格式不同。
+> 注意：OpenCode 1.2+ 使用 `mcp` 字段（不是 `mcpServers`），`command` 必须是字符串数组，环境变量使用 `environment` 对象。
 
 启动 OpenCode 后，MCP 工具会自动加载，可直接在对话中使用 `capture_current_page` 和 `search_local_codebase`。
 

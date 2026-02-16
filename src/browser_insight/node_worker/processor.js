@@ -15,6 +15,8 @@ const walk = require('acorn-walk');
 
 const LARGE_FILE_THRESHOLD = 5 * 1024 * 1024; // 5MB
 const LINE_CHUNK_SIZE = 200;
+const CHAR_CHUNK_SIZE = 4000; // 单行压缩文件按字符切分
+const MAX_CHUNK_CHARS = 8000; // 单个 chunk 最大字符数
 
 let SourceMapConsumer = null;
 
@@ -26,6 +28,13 @@ async function initSourceMap() {
 
 function chunkByLines(code, chunkSize) {
     const lines = code.split('\n');
+
+    // 单行压缩文件: 按字符切分而非按行
+    const avgLineLen = code.length / Math.max(lines.length, 1);
+    if (avgLineLen > CHAR_CHUNK_SIZE) {
+        return chunkByChars(code);
+    }
+
     const chunks = [];
     for (let i = 0; i < lines.length; i += chunkSize) {
         const slice = lines.slice(i, i + chunkSize);
@@ -38,7 +47,26 @@ function chunkByLines(code, chunkSize) {
     return chunks;
 }
 
+function chunkByChars(code) {
+    const chunks = [];
+    for (let i = 0; i < code.length; i += CHAR_CHUNK_SIZE) {
+        const content = code.substring(i, i + CHAR_CHUNK_SIZE);
+        chunks.push({
+            content,
+            lineStart: 1,
+            lineEnd: 1,
+            charStart: i,
+            charEnd: Math.min(i + CHAR_CHUNK_SIZE, code.length)
+        });
+    }
+    return chunks;
+}
+
 function extractSemanticChunks(code) {
+    const lines = code.split('\n');
+    const avgLineLen = code.length / Math.max(lines.length, 1);
+    const isMinified = avgLineLen > CHAR_CHUNK_SIZE;
+
     let ast;
     try {
         ast = acorn.parse(code, {
@@ -63,17 +91,40 @@ function extractSemanticChunks(code) {
         }
     }
 
-    const lines = code.split('\n');
     const chunks = [];
     const coveredRanges = [];
 
     function extractNode(node) {
         if (!node.loc) return;
-        const lineStart = node.loc.start.line;
-        const lineEnd = node.loc.end.line;
-        const content = lines.slice(lineStart - 1, lineEnd).join('\n');
-        if (content.trim().length > 0) {
+        if (typeof node.start !== 'number' || typeof node.end !== 'number') return;
+
+        let content;
+        let lineStart, lineEnd;
+
+        if (isMinified) {
+            content = code.substring(node.start, node.end);
+            lineStart = 1;
+            lineEnd = 1;
+        } else {
+            lineStart = node.loc.start.line;
+            lineEnd = node.loc.end.line;
+            content = lines.slice(lineStart - 1, lineEnd).join('\n');
+        }
+
+        if (content.trim().length === 0) return;
+
+        if (content.length > MAX_CHUNK_CHARS) {
+            const subChunks = chunkByChars(content);
+            for (const sc of subChunks) {
+                chunks.push({ content: sc.content, lineStart, lineEnd });
+            }
+        } else {
             chunks.push({ content, lineStart, lineEnd });
+        }
+
+        if (isMinified) {
+            coveredRanges.push([node.start, node.end]);
+        } else {
             coveredRanges.push([lineStart, lineEnd]);
         }
     }
@@ -110,27 +161,48 @@ function extractSemanticChunks(code) {
     coveredRanges.sort((a, b) => a[0] - b[0]);
     const uncoveredChunks = [];
     let lastEnd = 0;
-    for (const [start, end] of coveredRanges) {
-        if (start > lastEnd + 1) {
-            const gapContent = lines.slice(lastEnd, start - 1).join('\n').trim();
-            if (gapContent.length > 50) {
-                uncoveredChunks.push({
-                    content: gapContent,
-                    lineStart: lastEnd + 1,
-                    lineEnd: start - 1
-                });
+
+    if (isMinified) {
+        for (const [start, end] of coveredRanges) {
+            if (start > lastEnd + 50) {
+                const gapContent = code.substring(lastEnd, start).trim();
+                if (gapContent.length > 50) {
+                    const gapChunks = chunkByChars(gapContent);
+                    uncoveredChunks.push(...gapChunks);
+                }
+            }
+            lastEnd = Math.max(lastEnd, end);
+        }
+        if (lastEnd < code.length) {
+            const tailContent = code.substring(lastEnd).trim();
+            if (tailContent.length > 50) {
+                const tailChunks = chunkByChars(tailContent);
+                uncoveredChunks.push(...tailChunks);
             }
         }
-        lastEnd = Math.max(lastEnd, end);
-    }
-    if (lastEnd < lines.length) {
-        const tailContent = lines.slice(lastEnd).join('\n').trim();
-        if (tailContent.length > 50) {
-            uncoveredChunks.push({
-                content: tailContent,
-                lineStart: lastEnd + 1,
-                lineEnd: lines.length
-            });
+    } else {
+        for (const [start, end] of coveredRanges) {
+            if (start > lastEnd + 1) {
+                const gapContent = lines.slice(lastEnd, start - 1).join('\n').trim();
+                if (gapContent.length > 50) {
+                    uncoveredChunks.push({
+                        content: gapContent,
+                        lineStart: lastEnd + 1,
+                        lineEnd: start - 1
+                    });
+                }
+            }
+            lastEnd = Math.max(lastEnd, end);
+        }
+        if (lastEnd < lines.length) {
+            const tailContent = lines.slice(lastEnd).join('\n').trim();
+            if (tailContent.length > 50) {
+                uncoveredChunks.push({
+                    content: tailContent,
+                    lineStart: lastEnd + 1,
+                    lineEnd: lines.length
+                });
+            }
         }
     }
 

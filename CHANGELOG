@@ -1,5 +1,11 @@
 # CHANGELOG
 
+- [2026-02-16 15:20] FIX: 修复多个工具在真实逆向场景中的可用性问题 (Files: src/browser_insight/services/browser_connector.py, src/browser_insight/services/embedding_service.py, src/browser_insight/main.py)
+  - 重构 CDP WebSocket 消息路由：command 响应和 event 分离，解决 network capture 和 evaluate 互相干扰
+  - capture_network_requests/hook_function 新增 trigger_action 参数，AI 可在监听期间自动触发操作
+  - search_local_codebase 去重，避免返回重复代码片段
+  - embedding_service 增加 429 限流自动重试（指数退避）
+  - embedding_service 修复空文本导致 API 400 错误
 - [2026-02-16 15:05] FEAT: 新增 6 个逆向分析 MCP 工具，完善 AI 自动逆向能力 (Files: src/browser_insight/main.py, src/browser_insight/services/browser_connector.py, src/browser_insight/services/index_manager.py, doc/API.md)
   - list_captured_files: 列出已抓取的 JS 文件列表
   - read_js_file: 读取 JS 文件源码（支持行范围）

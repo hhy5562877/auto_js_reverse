@@ -66,14 +66,8 @@ def _find_chrome_binary() -> Optional[str]:
 def _no_proxy_env() -> dict[str, str]:
     env = os.environ.copy()
     for key in (
-        "ALL_PROXY",
-        "all_proxy",
-        "HTTPS_PROXY",
-        "https_proxy",
-        "HTTP_PROXY",
-        "http_proxy",
-        "SOCKS_PROXY",
-        "socks_proxy",
+        "ALL_PROXY", "all_proxy", "HTTPS_PROXY", "https_proxy",
+        "HTTP_PROXY", "http_proxy", "SOCKS_PROXY", "socks_proxy",
     ):
         env.pop(key, None)
     env["NO_PROXY"] = "localhost,127.0.0.1"
@@ -105,10 +99,45 @@ class BrowserConnector:
         self._chrome_process: Optional[subprocess.Popen] = None
         self._launched_by_us = False
         self._connected_tab_url: Optional[str] = None
+        self._pending_commands: dict[int, asyncio.Future] = {}
+        self._event_queue: asyncio.Queue = asyncio.Queue()
+        self._reader_task: Optional[asyncio.Task] = None
+
+    async def _start_reader(self) -> None:
+        if self._reader_task and not self._reader_task.done():
+            return
+        self._reader_task = asyncio.create_task(self._ws_reader_loop())
+
+    async def _stop_reader(self) -> None:
+        if self._reader_task and not self._reader_task.done():
+            self._reader_task.cancel()
+            try:
+                await self._reader_task
+            except asyncio.CancelledError:
+                pass
+        self._reader_task = None
+
+    async def _ws_reader_loop(self) -> None:
+        try:
+            while self._ws:
+                try:
+                    raw = await self._ws.recv()
+                except ConnectionClosed:
+                    break
+                msg = json.loads(raw)
+                msg_id = msg.get("id")
+                if msg_id is not None and msg_id in self._pending_commands:
+                    self._pending_commands[msg_id].set_result(msg)
+                elif "method" in msg:
+                    try:
+                        self._event_queue.put_nowait(msg)
+                    except asyncio.QueueFull:
+                        pass
+        except asyncio.CancelledError:
+            pass
 
     async def _is_cdp_available(self) -> bool:
         import aiohttp
-
         url = f"http://{self._host}:{self._port}/json"
         try:
             connector = aiohttp.TCPConnector(force_close=True)
@@ -161,7 +190,6 @@ class BrowserConnector:
 
     async def _fetch_all_tabs(self) -> list[dict]:
         import aiohttp
-
         url = f"http://{self._host}:{self._port}/json"
         try:
             connector = aiohttp.TCPConnector(force_close=True)
@@ -207,6 +235,13 @@ class BrowserConnector:
             additional_headers={"Host": f"{self._host}:{self._port}"},
             proxy=None,
         )
+        self._pending_commands.clear()
+        while not self._event_queue.empty():
+            try:
+                self._event_queue.get_nowait()
+            except asyncio.QueueEmpty:
+                break
+        await self._start_reader()
 
     async def _ensure_cdp_available(self) -> None:
         if await self._is_cdp_available():
@@ -266,9 +301,7 @@ class BrowserConnector:
             except (ConnectionRefusedError, OSError, InvalidURI, ImportError) as e:
                 logger.warning(
                     "CDP WebSocket 连接失败 (尝试 %d/%d): %s",
-                    attempt + 1,
-                    self._max_reconnect,
-                    e,
+                    attempt + 1, self._max_reconnect, e,
                 )
                 if attempt < self._max_reconnect - 1:
                     await asyncio.sleep(self._reconnect_interval)
@@ -297,6 +330,42 @@ class BrowserConnector:
         if not self.is_connected:
             await self.connect(target_url=target_url)
 
+    async def _send_command(
+        self, method: str, params: dict[str, Any] | None = None
+    ) -> dict:
+        if not self._ws:
+            await self.connect()
+
+        self._msg_id += 1
+        cmd_id = self._msg_id
+        msg = {"id": cmd_id, "method": method}
+        if params:
+            msg["params"] = params
+
+        future: asyncio.Future = asyncio.get_event_loop().create_future()
+        self._pending_commands[cmd_id] = future
+
+        try:
+            await self._ws.send(json.dumps(msg))
+        except ConnectionClosed:
+            self._pending_commands.pop(cmd_id, None)
+            await self.connect()
+            future = asyncio.get_event_loop().create_future()
+            self._pending_commands[cmd_id] = future
+            await self._ws.send(json.dumps(msg))
+
+        try:
+            resp = await asyncio.wait_for(future, timeout=30.0)
+        except asyncio.TimeoutError:
+            self._pending_commands.pop(cmd_id, None)
+            raise RuntimeError(f"CDP 命令超时: {method}")
+        finally:
+            self._pending_commands.pop(cmd_id, None)
+
+        if "error" in resp:
+            raise RuntimeError(f"CDP Error: {resp['error']}")
+        return resp.get("result", {})
+
     async def evaluate(self, expression: str, return_by_value: bool = True) -> Any:
         await self.ensure_connected()
         result = await self._send_command(
@@ -322,9 +391,22 @@ class BrowserConnector:
 
     async def disable_network(self) -> None:
         await self.ensure_connected()
-        await self._send_command("Network.disable")
+        try:
+            await self._send_command("Network.disable")
+        except Exception:
+            pass
+
+    def _drain_events(self) -> list[dict]:
+        events = []
+        while not self._event_queue.empty():
+            try:
+                events.append(self._event_queue.get_nowait())
+            except asyncio.QueueEmpty:
+                break
+        return events
 
     async def collect_network_events(self, duration_sec: float = 10.0) -> list[dict]:
+        self._drain_events()
         await self.enable_network()
         requests_map: dict[str, dict] = {}
 
@@ -335,10 +417,9 @@ class BrowserConnector:
                 if remaining <= 0:
                     break
                 try:
-                    raw = await asyncio.wait_for(
-                        self._ws.recv(), timeout=min(remaining, 1.0)
+                    event = await asyncio.wait_for(
+                        self._event_queue.get(), timeout=min(remaining, 0.5)
                     )
-                    event = json.loads(raw)
                     method = event.get("method", "")
 
                     if method == "Network.requestWillBeSent":
@@ -385,9 +466,11 @@ class BrowserConnector:
             return None
 
     async def disconnect(self) -> None:
+        await self._stop_reader()
         if self._ws:
             await self._ws.close()
             self._ws = None
+        self._pending_commands.clear()
 
     def shutdown_chrome(self) -> None:
         if self._launched_by_us and self._chrome_process:
@@ -401,31 +484,6 @@ class BrowserConnector:
                 self._chrome_process.kill()
             self._chrome_process = None
             self._launched_by_us = False
-
-    async def _send_command(
-        self, method: str, params: dict[str, Any] | None = None
-    ) -> dict:
-        if not self._ws:
-            await self.connect()
-
-        self._msg_id += 1
-        msg = {"id": self._msg_id, "method": method}
-        if params:
-            msg["params"] = params
-
-        try:
-            await self._ws.send(json.dumps(msg))
-        except ConnectionClosed:
-            await self.connect()
-            await self._ws.send(json.dumps(msg))
-
-        while True:
-            raw = await self._ws.recv()
-            resp = json.loads(raw)
-            if resp.get("id") == self._msg_id:
-                if "error" in resp:
-                    raise RuntimeError(f"CDP Error: {resp['error']}")
-                return resp.get("result", {})
 
     async def get_current_url(self) -> str:
         result = await self._send_command(
@@ -464,7 +522,6 @@ class BrowserConnector:
     async def download_resource(self, url: str) -> Optional[bytes]:
         try:
             import aiohttp
-
             connector = aiohttp.TCPConnector(force_close=True)
             async with aiohttp.ClientSession(connector=connector) as session:
                 async with session.get(

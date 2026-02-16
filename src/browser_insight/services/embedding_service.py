@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 from typing import Optional
@@ -38,9 +39,14 @@ class EmbeddingService:
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
         }
-        truncated = [
-            t[:MAX_TEXT_CHARS] if len(t) > MAX_TEXT_CHARS else t for t in texts
-        ]
+        truncated = []
+        for t in texts:
+            t = t.strip()
+            if not t:
+                t = " "
+            if len(t) > MAX_TEXT_CHARS:
+                t = t[:MAX_TEXT_CHARS]
+            truncated.append(t)
         payload = {
             "model": self._model_name,
             "input": truncated,
@@ -48,18 +54,27 @@ class EmbeddingService:
         }
 
         async with aiohttp.ClientSession() as session:
-            async with session.post(
-                self._api_url,
-                json=payload,
-                headers=headers,
-                timeout=aiohttp.ClientTimeout(total=60),
-            ) as resp:
-                if resp.status != 200:
-                    body = await resp.text()
-                    raise RuntimeError(
-                        f"硅基流动 Embedding API 错误 (HTTP {resp.status}): {body}"
-                    )
-                result = await resp.json()
+            for attempt in range(3):
+                async with session.post(
+                    self._api_url,
+                    json=payload,
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=60),
+                ) as resp:
+                    if resp.status == 429:
+                        wait = 2**attempt + 1
+                        logger.warning("API 限流 (429)，等待 %ds 后重试", wait)
+                        await asyncio.sleep(wait)
+                        continue
+                    if resp.status != 200:
+                        body = await resp.text()
+                        raise RuntimeError(
+                            f"硅基流动 Embedding API 错误 (HTTP {resp.status}): {body}"
+                        )
+                    result = await resp.json()
+                    break
+            else:
+                raise RuntimeError("硅基流动 Embedding API 限流，重试 3 次仍失败")
 
         data = result.get("data", [])
         data.sort(key=lambda x: x["index"])

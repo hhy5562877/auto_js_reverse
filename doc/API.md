@@ -108,6 +108,7 @@
 |--------|------|------|------|
 | `target_url` | `str` | 否 | 目标页面 URL |
 | `duration` | `float` | 否 (默认 `10.0`) | 监听时长（秒） |
+| `trigger_action` | `str` | 否 | 监听开始后自动执行的 JS 代码，用于触发网络请求。不填则自动刷新页面 |
 | `filter_type` | `str` | 否 | 过滤请求类型：`XHR`、`Fetch`、`Script` |
 
 **返回:** 请求列表，包含 URL、方法、请求头、POST 数据、响应状态。自动高亮 Authorization/Cookie/签名等关键请求头。
@@ -127,6 +128,7 @@
 |--------|------|------|------|
 | `function_path` | `str` | 是 | 函数路径，例如 `window.encrypt`、`CryptoJS.MD5` |
 | `target_url` | `str` | 否 | 目标页面 URL |
+| `trigger_action` | `str` | 否 | Hook 注入后自动执行的 JS 代码，用于触发目标函数调用 |
 | `max_calls` | `int` | 否 (默认 `10`) | 最多记录调用次数 |
 | `duration` | `float` | 否 (默认 `15.0`) | 监听时长（秒） |
 

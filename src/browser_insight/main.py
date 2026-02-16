@@ -92,8 +92,16 @@ async def search_local_codebase(
     if not results:
         return "未找到相关代码。请先使用 capture_current_page 抓取页面。"
 
+    seen_texts: set[str] = set()
+    unique_results = []
+    for r in results:
+        text_key = r.get("text", "")[:200]
+        if text_key not in seen_texts:
+            seen_texts.add(text_key)
+            unique_results.append(r)
+
     output_parts = []
-    for i, r in enumerate(results, 1):
+    for i, r in enumerate(unique_results, 1):
         source_tag = (
             "🔄 Source Map 还原" if r.get("source_map_restored") else "📦 混淆代码"
         )
@@ -192,9 +200,7 @@ async def read_js_file(
 
 
 @mcp.tool
-async def execute_js(
-    expression: str, target_url: Optional[str] = None
-) -> str:
+async def execute_js(expression: str, target_url: Optional[str] = None) -> str:
     """在当前浏览器页面上下文中执行 JavaScript 表达式并返回结果。
     用于逆向分析时验证假设、调用页面函数、检查变量值等。
 
@@ -227,38 +233,48 @@ async def execute_js(
 async def capture_network_requests(
     target_url: Optional[str] = None,
     duration: float = 10.0,
+    trigger_action: Optional[str] = None,
     filter_type: Optional[str] = None,
 ) -> str:
     """监听浏览器网络请求，捕获指定时间段内的所有 XHR/Fetch/脚本请求。
     这是逆向分析的核心工具——观察页面发出了哪些 API 请求、携带了什么参数和签名。
 
-    典型用法: 先调用此工具开始监听，然后在页面上触发操作（如登录、搜索），
-    工具会记录期间所有网络请求的 URL、方法、请求头、POST 数据和响应状态。
+    使用 trigger_action 参数传入一段 JS 代码，工具会在开始监听后自动执行它来触发网络请求。
+    例如传入 "document.querySelector('#submit').click()" 来点击提交按钮。
+    如果不传 trigger_action，工具会自动刷新页面来触发请求。
 
     Args:
         target_url: 目标页面 URL（可选，不填则使用当前页面）
         duration: 监听时长（秒），默认 10 秒
+        trigger_action: 监听开始后自动执行的 JS 代码，用于触发网络请求。例如点击按钮、提交表单、调用 fetch 等
         filter_type: 过滤请求类型，可选 "XHR"、"Fetch"、"Script"。不填则捕获所有类型
     """
     try:
         await pipeline._browser.ensure_connected(target_url=target_url)
-        events = await pipeline._browser.collect_network_events(
-            duration_sec=duration
-        )
+
+        async def _trigger():
+            await asyncio.sleep(0.3)
+            if trigger_action:
+                try:
+                    await pipeline._browser.evaluate(trigger_action)
+                except Exception as e:
+                    logger.warning("trigger_action 执行失败: %s", e)
+            else:
+                try:
+                    await pipeline._browser.evaluate("location.reload()")
+                except Exception:
+                    pass
+
+        asyncio.create_task(_trigger())
+        events = await pipeline._browser.collect_network_events(duration_sec=duration)
     except Exception as e:
         return f"❌ 网络监听失败: {e}"
 
     if filter_type:
-        events = [
-            e for e in events
-            if e.get("type", "").lower() == filter_type.lower()
-        ]
+        events = [e for e in events if e.get("type", "").lower() == filter_type.lower()]
 
     if not events:
-        return (
-            f"在 {duration} 秒内未捕获到网络请求。"
-            "尝试在页面上触发操作后重新监听。"
-        )
+        return f"在 {duration} 秒内未捕获到网络请求。尝试在页面上触发操作后重新监听。"
 
     lines = [f"🌐 捕获到 {len(events)} 个网络请求 ({duration}s)\n"]
     for i, evt in enumerate(events, 1):
@@ -282,9 +298,16 @@ async def capture_network_requests(
             for k, v in req_headers.items()
             if k.lower()
             in (
-                "authorization", "cookie", "x-token", "x-sign",
-                "x-signature", "x-timestamp", "x-nonce",
-                "content-type", "referer", "origin",
+                "authorization",
+                "cookie",
+                "x-token",
+                "x-sign",
+                "x-signature",
+                "x-timestamp",
+                "x-nonce",
+                "content-type",
+                "referer",
+                "origin",
             )
         }
         if interesting:
@@ -299,32 +322,49 @@ async def capture_network_requests(
 async def hook_function(
     function_path: str,
     target_url: Optional[str] = None,
+    trigger_action: Optional[str] = None,
     max_calls: int = 10,
     duration: float = 15.0,
 ) -> str:
     """在页面中 Hook 指定的 JavaScript 函数，记录其调用参数、返回值和调用栈。
     这是逆向分析加密函数的关键工具——找到可疑函数后，用 hook 观察实际的输入输出。
 
+    使用 trigger_action 参数传入一段 JS 代码，工具会在 Hook 注入后自动执行它来触发函数调用。
+    例如传入 "document.querySelector('#login-btn').click()" 来触发登录流程。
+    如果不传 trigger_action，工具会等待 duration 秒，期间页面自身的操作可能触发函数调用。
+
     Args:
         function_path: 要 hook 的函数路径，例如 "window.encrypt"、"JSON.stringify"、"CryptoJS.MD5"
         target_url: 目标页面 URL（可选）
+        trigger_action: Hook 注入后自动执行的 JS 代码，用于触发目标函数调用
         max_calls: 最多记录多少次调用，默认 10
         duration: 监听时长（秒），默认 15 秒
     """
     safe_path = function_path.replace("'", "\\'")
-    hook_js = """
+    hook_js = (
+        """
     (function() {
         var _hookedCalls = [];
-        var _maxCalls = """ + str(max_calls) + """;
+        var _maxCalls = """
+        + str(max_calls)
+        + """;
         var _target;
-        try { _target = """ + function_path + """; } catch(e) {
-            return JSON.stringify({error: '""" + safe_path + """ 不存在: ' + e.message});
+        try { _target = """
+        + function_path
+        + """; } catch(e) {
+            return JSON.stringify({error: '"""
+        + safe_path
+        + """ 不存在: ' + e.message});
         }
         if (typeof _target !== 'function') {
-            return JSON.stringify({error: '""" + safe_path + """ 不是函数'});
+            return JSON.stringify({error: '"""
+        + safe_path
+        + """ 不是函数'});
         }
         var _original = _target;
-        var _parts = '""" + safe_path + """'.split('.');
+        var _parts = '"""
+        + safe_path
+        + """'.split('.');
         var _parent = _parts.length > 1
             ? _parts.slice(0, -1).reduce(function(o, k) { return o[k]; }, window)
             : window;
@@ -350,9 +390,12 @@ async def hook_function(
             calls: _hookedCalls,
             restore: function() { _parent[_key] = _original; },
         };
-        return JSON.stringify({status: 'hooked', target: '""" + safe_path + """'});
+        return JSON.stringify({status: 'hooked', target: '"""
+        + safe_path
+        + """'});
     })()
     """
+    )
 
     try:
         await pipeline._browser.ensure_connected(target_url=target_url)
@@ -363,6 +406,12 @@ async def hook_function(
     parsed = json.loads(hook_result) if isinstance(hook_result, str) else hook_result
     if isinstance(parsed, dict) and parsed.get("error"):
         return f"❌ {parsed['error']}"
+
+    if trigger_action:
+        try:
+            await pipeline._browser.evaluate(trigger_action)
+        except Exception as e:
+            logger.warning("trigger_action 执行失败: %s", e)
 
     await asyncio.sleep(duration)
 
@@ -378,7 +427,9 @@ async def hook_function(
 
     calls = json.loads(calls_raw) if isinstance(calls_raw, str) else calls_raw
     if not calls:
-        return f"在 {duration} 秒内 `{function_path}` 未被调用。尝试在页面上触发相关操作。"
+        return (
+            f"在 {duration} 秒内 `{function_path}` 未被调用。尝试在页面上触发相关操作。"
+        )
 
     lines = [f"🪝 `{function_path}` 被调用 {len(calls)} 次 ({duration}s)\n"]
     for i, call in enumerate(calls, 1):

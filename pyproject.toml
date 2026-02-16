@@ -1,0 +1,28 @@
+[project]
+name = "browser-insight-mcp"
+version = "1.0.0"
+description = "Browser Insight Hybrid MCP - 浏览器代码分析引擎 (Python Host + Node.js Worker)"
+requires-python = ">=3.10"
+dependencies = [
+    "fastmcp>=2.0.0",
+    "websockets>=12.0",
+    "lancedb>=0.6.0",
+    "fastembed>=0.3.0",
+    "pyarrow>=14.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[project.scripts]
+browser-insight = "browser_insight.main:main"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[tool.setuptools.packages.find]
+where = ["src"]

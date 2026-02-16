@@ -1,0 +1,12 @@
+{
+  "name": "browser-insight-node-worker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Node.js Worker for JS parsing and Source Map restoration",
+  "main": "processor.js",
+  "dependencies": {
+    "acorn": "^8.12.0",
+    "acorn-walk": "^8.3.0",
+    "source-map": "^0.7.4"
+  }
+}

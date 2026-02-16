@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+.eggs/
+
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# Node.js
+node_modules/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Ruff / Linter cache
+.ruff_cache/
+
+# MCP 运行时数据 (数据库、模型、归档、Chrome 配置全部在 storage/ 下)
+storage/
+
+# 测试临时文件
+/tmp_test_storage/
+tests/tmp_*/
+
+# Chrome 用户数据
+.browser_insight/
+
+# Embedding 模型缓存
+.cache/
+
+# OS
+Thumbs.db

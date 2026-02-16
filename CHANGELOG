@@ -1,0 +1,23 @@
+# CHANGELOG
+
+- [2026-02-16 12:45] REFACTOR: 所有运行时数据统一存储到 storage/ 目录下（数据库 storage/db、模型 storage/models、归档 storage/archives、Chrome 配置 storage/chrome_profile） (Files: .mcp_config/config.json, src/browser_insight/services/pipeline.py, src/browser_insight/services/embedding_service.py, src/browser_insight/services/browser_connector.py, .gitignore, README.md)
+- [2026-02-16 12:39] FEAT: 端到端集成测试 (www.baidu.com)，覆盖 Chrome 检测、Node.js Worker、Embedding、IndexManager、完整管线五个环节 (Files: tests/test_e2e_baidu.py)
+- [2026-02-16 12:39] FIX: NodeBridge stdout 流限制从 64KB 提升到 50MB，修复大量代码块解析时 LimitOverrunError (Files: src/browser_insight/services/node_bridge.py)
+- [2026-02-16 12:39] CHORE: 补全 .gitignore，添加 Python 依赖 pandas/python-socks (Files: .gitignore, pyproject.toml)
+- [2026-02-16 12:20] DOCS: README 重写 IDE 配置章节，统一使用 uv run 启动，覆盖 Cursor/Windsurf/Claude Code/VS Code 四种 IDE 的 JSON 配置方式 (Files: README.md)
+- [2026-02-16 12:10] FEAT: capture_current_page 新增 storage_path 必填参数，由 AI 指定文件存储路径；存储结构改为 {storage_path}/{日期}/{域名}/{原始URL路径}，保留网站原始目录结构 (Files: src/browser_insight/main.py, src/browser_insight/services/pipeline.py, doc/API.md, README.md)
+- [2026-02-16 12:00] FEAT: Chrome 自动启动功能，未检测到远程调试端口时自动查找并启动本机浏览器 (Files: src/browser_insight/services/browser_connector.py, src/browser_insight/services/pipeline.py, .mcp_config/config.json, README.md)
+  - 支持自动检测 Chrome/Chromium/Brave/Edge
+  - 支持 headless 无头模式
+  - 独立用户数据目录，不影响日常 Chrome 配置
+  - 可通过 auto_launch 配置项关闭
+- [2026-02-16 11:50] DOCS: 添加 README 使用文档，包含 Claude Code/Cursor/通用 MCP 客户端接入方式和 hf-mirror 镜像配置 (Files: README.md)
+- [2026-02-16 11:38] FEAT: 初始化 Browser Insight Hybrid MCP 项目，实现完整的混合架构 (Files: pyproject.toml, .mcp_config/config.json, src/browser_insight/node_worker/package.json, src/browser_insight/node_worker/processor.js, src/browser_insight/services/browser_connector.py, src/browser_insight/services/node_bridge.py, src/browser_insight/services/index_manager.py, src/browser_insight/services/embedding_service.py, src/browser_insight/services/pipeline.py, src/browser_insight/main.py)
+  - Node.js Worker: source-map 高保真还原 + acorn AST 语义切分
+  - Python BrowserConnector: CDP WebSocket 连接、资源发现、脚本下载
+  - Python NodeBridge: Node.js 子进程常驻管理、stdin/stdout JSON 行协议通信
+  - Python IndexManager: LanceDB 哈希去重 + 向量检索
+  - Python EmbeddingService: FastEmbed ONNX 轻量向量化
+  - Python Pipeline: 完整数据管线（抓取→归档→解析→向量化→入库）
+  - FastMCP Server: capture_current_page / search_local_codebase / list_archived_sites
+- [2026-02-16 11:38] DOCS: 创建 API 文档和 CHANGELOG (Files: doc/API.md, CHANGELOG)

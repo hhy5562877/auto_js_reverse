@@ -10,6 +10,8 @@ logger = logging.getLogger(__name__)
 
 SILICONFLOW_API_URL = "https://api.siliconflow.cn/v1/embeddings"
 MAX_BATCH_SIZE = 32
+# bge-m3 最大 8192 tokens，代码 token 密度高（约 1 token ≈ 2-3 字符），保守截断
+MAX_TEXT_CHARS = 4000
 
 
 class EmbeddingService:
@@ -36,9 +38,12 @@ class EmbeddingService:
             "Authorization": f"Bearer {self._api_key}",
             "Content-Type": "application/json",
         }
+        truncated = [
+            t[:MAX_TEXT_CHARS] if len(t) > MAX_TEXT_CHARS else t for t in texts
+        ]
         payload = {
             "model": self._model_name,
-            "input": texts,
+            "input": truncated,
             "encoding_format": "float",
         }
 
@@ -62,17 +67,28 @@ class EmbeddingService:
 
     async def embed_texts(self, texts: list[str]) -> list[list[float]]:
         all_embeddings: list[list[float]] = []
+        zero_vector: list[float] = [0.0] * 1024
 
         for i in range(0, len(texts), self._batch_size):
             batch = texts[i : i + self._batch_size]
-            embeddings = await self._request_embeddings(batch)
-            all_embeddings.extend(embeddings)
-            logger.debug(
-                "向量化批次 %d/%d 完成 (%d 条)",
-                i // self._batch_size + 1,
-                (len(texts) - 1) // self._batch_size + 1,
-                len(batch),
-            )
+            try:
+                embeddings = await self._request_embeddings(batch)
+                all_embeddings.extend(embeddings)
+            except RuntimeError as e:
+                if "413" not in str(e):
+                    raise
+                logger.warning(
+                    "批次 %d 超 token 限制，降级为逐条处理", i // self._batch_size + 1
+                )
+                for j, text in enumerate(batch):
+                    try:
+                        emb = await self._request_embeddings([text])
+                        all_embeddings.extend(emb)
+                    except RuntimeError:
+                        logger.warning(
+                            "跳过超长文本 (index=%d, len=%d)", i + j, len(text)
+                        )
+                        all_embeddings.append(zero_vector)
 
         return all_embeddings
 

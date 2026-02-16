@@ -1,5 +1,15 @@
 # CHANGELOG
 
+- [2026-02-16 16:00] FIX: 修复 Node.js Worker 解析压缩 JS 文件时内存爆炸导致 chunks_indexed=0 的问题 (Files: src/browser_insight/node_worker/processor.js)
+  - 根因: 压缩文件(如 main-es5.js 3MB单行)的 AST 节点用行号切片时，每个节点都提取整行(=整个文件)，导致 6552 chunks × 3MB = 18.6GB
+  - 修复: 检测压缩文件(平均行长 > 4000 字符)后，使用字符偏移(node.start/node.end)替代行号切片
+  - 新增 chunkByChars() 按 4000 字符切分，MAX_CHUNK_CHARS=8000 防止单个 chunk 过大
+  - 修复前: fenbi.com 9个文件 → JSON.stringify 失败 "Invalid string length"
+  - 修复后: fenbi.com 9个文件 → 11,404 chunks, JSON 7.5MB, 解析成功
+- [2026-02-16 15:48] FEAT: fenbi.com MCP 工具链集成测试，验证 8 个 MCP 工具的逆向辅助能力 (Files: tests/test_fenbi_mcp_tools.py)
+  - 直接调用 MCP 工具函数(通过 FastMCP FunctionTool.fn)模拟 AI 使用工具进行逆向
+  - 9 个步骤: capture → list → analyze → search → read → execute → hook → network → verify
+  - 逆向结论: window.encrypt(publicKey, plaintext) → RSA(65537) → Base64, 登录 API: POST api/users/loginV2
 - [2026-02-16 15:20] FIX: 修复多个工具在真实逆向场景中的可用性问题 (Files: src/browser_insight/services/browser_connector.py, src/browser_insight/services/embedding_service.py, src/browser_insight/main.py)
   - 重构 CDP WebSocket 消息路由：command 响应和 event 分离，解决 network capture 和 evaluate 互相干扰
   - capture_network_requests/hook_function 新增 trigger_action 参数，AI 可在监听期间自动触发操作

@@ -289,6 +289,101 @@ class BrowserConnector:
         logger.info("已导航到: %s", current)
         return current
 
+    @property
+    def is_connected(self) -> bool:
+        return self._ws is not None
+
+    async def ensure_connected(self, target_url: Optional[str] = None) -> None:
+        if not self.is_connected:
+            await self.connect(target_url=target_url)
+
+    async def evaluate(self, expression: str, return_by_value: bool = True) -> Any:
+        await self.ensure_connected()
+        result = await self._send_command(
+            "Runtime.evaluate",
+            {
+                "expression": expression,
+                "returnByValue": return_by_value,
+                "awaitPromise": True,
+                "generatePreview": True,
+            },
+        )
+        if "exceptionDetails" in result:
+            exc = result["exceptionDetails"]
+            text = exc.get("text", "")
+            exception = exc.get("exception", {})
+            desc = exception.get("description", text)
+            raise RuntimeError(f"JS 执行异常: {desc}")
+        return result.get("result", {}).get("value")
+
+    async def enable_network(self) -> None:
+        await self.ensure_connected()
+        await self._send_command("Network.enable")
+
+    async def disable_network(self) -> None:
+        await self.ensure_connected()
+        await self._send_command("Network.disable")
+
+    async def collect_network_events(self, duration_sec: float = 10.0) -> list[dict]:
+        await self.enable_network()
+        requests_map: dict[str, dict] = {}
+
+        end_time = asyncio.get_event_loop().time() + duration_sec
+        try:
+            while asyncio.get_event_loop().time() < end_time:
+                remaining = end_time - asyncio.get_event_loop().time()
+                if remaining <= 0:
+                    break
+                try:
+                    raw = await asyncio.wait_for(
+                        self._ws.recv(), timeout=min(remaining, 1.0)
+                    )
+                    event = json.loads(raw)
+                    method = event.get("method", "")
+
+                    if method == "Network.requestWillBeSent":
+                        params = event.get("params", {})
+                        req_id = params.get("requestId", "")
+                        request = params.get("request", {})
+                        requests_map[req_id] = {
+                            "requestId": req_id,
+                            "url": request.get("url", ""),
+                            "method": request.get("method", ""),
+                            "headers": request.get("headers", {}),
+                            "postData": request.get("postData", ""),
+                            "type": params.get("type", ""),
+                            "initiator": params.get("initiator", {}).get("type", ""),
+                            "response": None,
+                        }
+
+                    elif method == "Network.responseReceived":
+                        params = event.get("params", {})
+                        req_id = params.get("requestId", "")
+                        response = params.get("response", {})
+                        if req_id in requests_map:
+                            requests_map[req_id]["response"] = {
+                                "status": response.get("status", 0),
+                                "statusText": response.get("statusText", ""),
+                                "headers": response.get("headers", {}),
+                                "mimeType": response.get("mimeType", ""),
+                            }
+
+                except asyncio.TimeoutError:
+                    continue
+        finally:
+            await self.disable_network()
+
+        return list(requests_map.values())
+
+    async def get_response_body(self, request_id: str) -> Optional[str]:
+        try:
+            result = await self._send_command(
+                "Network.getResponseBody", {"requestId": request_id}
+            )
+            return result.get("body", "")
+        except Exception:
+            return None
+
     async def disconnect(self) -> None:
         if self._ws:
             await self._ws.close()

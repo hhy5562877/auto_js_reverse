@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import warnings
 from typing import Optional
 
 import lancedb
@@ -127,3 +128,43 @@ class IndexManager:
             self._code_chunks.delete(f"domain = '{domain}'")
         except Exception as e:
             logger.warning("删除域名 %s 数据失败: %s", domain, e)
+
+    def list_files_by_domain(self, domain: Optional[str] = None) -> list[dict]:
+        try:
+            df = self._file_index.to_pandas()
+            if df.empty:
+                return []
+            if domain:
+                df = df[df["domain"] == domain]
+            return df.to_dict("records")
+        except Exception:
+            return []
+
+    def get_file_by_url(self, url: str) -> Optional[dict]:
+        try:
+            results = (
+                self._file_index.search().where(f"url = '{url}'").limit(1).to_list()
+            )
+            return results[0] if results else None
+        except Exception:
+            return None
+
+    def search_chunks_by_text(
+        self, pattern: str, domain: Optional[str] = None, limit: int = 50
+    ) -> list[dict]:
+        try:
+            df = self._code_chunks.to_pandas()
+            if df.empty:
+                return []
+            if domain:
+                df = df[df["domain"] == domain]
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                mask = df["text"].str.contains(
+                    pattern, case=False, na=False, regex=True
+                )
+            matched = df[mask].head(limit)
+            cols = [c for c in matched.columns if c != "vector"]
+            return matched[cols].to_dict("records")
+        except Exception:
+            return []

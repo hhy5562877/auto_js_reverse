@@ -1,5 +1,14 @@
 # CHANGELOG
 
+- [2026-02-16 15:05] FEAT: 新增 6 个逆向分析 MCP 工具，完善 AI 自动逆向能力 (Files: src/browser_insight/main.py, src/browser_insight/services/browser_connector.py, src/browser_insight/services/index_manager.py, doc/API.md)
+  - list_captured_files: 列出已抓取的 JS 文件列表
+  - read_js_file: 读取 JS 文件源码（支持行范围）
+  - execute_js: 在页面上下文执行 JS 表达式
+  - capture_network_requests: CDP Network 域监听网络请求
+  - hook_function: Hook 页面函数记录调用参数/返回值/调用栈
+  - analyze_encryption: 自动扫描加密模式（MD5/AES/RSA/Base64/HMAC 等）
+  - BrowserConnector 扩展: evaluate()、enable_network()、collect_network_events()
+  - IndexManager 扩展: list_files_by_domain()、get_file_by_url()、search_chunks_by_text()
 - [2026-02-16 12:45] REFACTOR: 所有运行时数据统一存储到 storage/ 目录下（数据库 storage/db、模型 storage/models、归档 storage/archives、Chrome 配置 storage/chrome_profile） (Files: .mcp_config/config.json, src/browser_insight/services/pipeline.py, src/browser_insight/services/embedding_service.py, src/browser_insight/services/browser_connector.py, .gitignore, README.md)
 - [2026-02-16 12:39] FEAT: 端到端集成测试 (www.baidu.com)，覆盖 Chrome 检测、Node.js Worker、Embedding、IndexManager、完整管线五个环节 (Files: tests/test_e2e_baidu.py)
 - [2026-02-16 12:39] FIX: NodeBridge stdout 流限制从 64KB 提升到 50MB，修复大量代码块解析时 LimitOverrunError (Files: src/browser_insight/services/node_bridge.py)

@@ -1,5 +1,12 @@
 # CHANGELOG
 
+- [2026-02-17 23:49] DOCS: 完善 README Windows 部署教程 (Files: README.md, CHANGELOG)
+  - 安装步骤新增 Windows PowerShell 和 CMD 两种命令示例（venv 激活、Node.js 依赖安装）
+  - 环境变量设置新增 PowerShell `$env:` 和 CMD `set` 语法
+  - IDE 配置章节补充 Windows 路径获取方式和 JSON 中路径转义说明
+  - 其他 MCP 客户端启动命令新增 Windows PowerShell 和 CMD 版本
+  - 常见问题新增 Windows 端口检查命令 `netstat -ano | findstr :9222`
+  - 常见问题新增 Windows 下 uv 安装和 PowerShell 执行策略两个 FAQ
 - [2026-02-16 23:54] FIX: 修复 CDP fallback 重试跳过可用标签页与 read_js_file 路径归一化异常问题 (Files: src/browser_insight/services/browser_connector.py, src/browser_insight/main.py, CHANGELOG)
   - connect() 新增 failed_debugger_urls 失败集合，重试时优先选择未失败过的 tab，穷尽后才允许重试历史失败 tab
   - 修复多标签场景下 A->B->A 的重复尝试问题，避免可用 tab 因重试顺序被跳过

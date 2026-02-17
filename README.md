@@ -10,6 +10,8 @@
 - Node.js >= 18
 - Chrome / Chromium（可自动启动，无需手动配置）
 
+> Windows 用户：推荐使用 PowerShell 7+ 执行以下命令。uv 和 Node.js 均支持 Windows，安装方式参考各自官网。
+
 ## 安装
 
 ### 1. 克隆项目
@@ -21,13 +23,33 @@ cd auto_js_reverse
 
 ### 2. 安装 Python 依赖
 
+**macOS / Linux:**
+
 ```bash
 uv venv --python 3.12 .venv
 source .venv/bin/activate
 uv pip install fastmcp websockets lancedb fastembed pyarrow aiohttp numpy
 ```
 
+**Windows (PowerShell):**
+
+```powershell
+uv venv --python 3.12 .venv
+.venv\Scripts\Activate.ps1
+uv pip install fastmcp websockets lancedb fastembed pyarrow aiohttp numpy
+```
+
+**Windows (CMD):**
+
+```cmd
+uv venv --python 3.12 .venv
+.venv\Scripts\activate.bat
+uv pip install fastmcp websockets lancedb fastembed pyarrow aiohttp numpy
+```
+
 ### 3. 安装 Node.js 依赖
+
+**macOS / Linux:**
 
 ```bash
 cd src/browser_insight/node_worker
@@ -35,14 +57,36 @@ npm install
 cd ../../..
 ```
 
+**Windows:**
+
+```cmd
+cd src\browser_insight\node_worker
+npm install
+cd ..\..\..
+```
+
 ### 4. 配置硅基流动 API Key
 
-向量化使用[硅基流动](https://cloud.siliconflow.cn/)的 `BAAI/bge-m3` 远程 Embedding 模型，无需本地 GPU。
+向量化使用[硅基流动](https://cloud.siliconflow.cn/i/exnclWno/)的 `BAAI/bge-m3` 远程 Embedding 模型，无需本地 GPU。
 
-注册硅基流动账号后，在 [API Key 页面](https://cloud.siliconflow.cn/account/ak) 获取 Key，然后设置环境变量：
+注册[硅基流动](https://cloud.siliconflow.cn/i/exnclWno)账号后，在 [API Key 页面](https://cloud.siliconflow.cn/account/ak) 获取 Key，然后设置环境变量：
+
+**macOS / Linux:**
 
 ```bash
 export SILICONFLOW_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+**Windows (PowerShell):**
+
+```powershell
+$env:SILICONFLOW_API_KEY = "sk-xxxxxxxxxxxxxxxxxxxxxxxx"
+```
+
+**Windows (CMD):**
+
+```cmd
+set SILICONFLOW_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 或写入配置文件 `.mcp_config/config.json`：
@@ -122,7 +166,9 @@ google-chrome --remote-debugging-port=9222
 所有 IDE 均通过 JSON 配置文件接入 MCP 服务器，使用 `uv run` 启动以确保依赖环境正确。
 
 > 以下示例中 `/absolute/path/to/auto_js_reverse` 请替换为你的实际项目绝对路径。
-> 可通过 `cd auto_js_reverse && pwd` 获取。
+> - macOS / Linux：通过 `cd auto_js_reverse && pwd` 获取
+> - Windows：通过 `cd auto_js_reverse && cd` (CMD) 或 `cd auto_js_reverse; (Get-Location).Path` (PowerShell) 获取
+> - Windows 路径示例：`C:\Users\YourName\code\auto_js_reverse`，在 JSON 中需要双反斜杠 `C:\\Users\\YourName\\code\\auto_js_reverse` 或使用正斜杠 `C:/Users/YourName/code/auto_js_reverse`
 
 ### Cursor
 
@@ -278,10 +324,28 @@ claude mcp add browser-insight \
 
 任何支持 MCP Stdio 传输协议的客户端都可以接入。核心启动命令：
 
+**macOS / Linux:**
+
 ```bash
 SILICONFLOW_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx \
 PYTHONPATH=/absolute/path/to/auto_js_reverse/src \
 uv run --directory /absolute/path/to/auto_js_reverse --python 3.12 python -m browser_insight.main
+```
+
+**Windows (PowerShell):**
+
+```powershell
+$env:SILICONFLOW_API_KEY = "sk-xxxxxxxxxxxxxxxxxxxxxxxx"
+$env:PYTHONPATH = "C:\absolute\path\to\auto_js_reverse\src"
+uv run --directory "C:\absolute\path\to\auto_js_reverse" --python 3.12 python -m browser_insight.main
+```
+
+**Windows (CMD):**
+
+```cmd
+set SILICONFLOW_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
+set PYTHONPATH=C:\absolute\path\to\auto_js_reverse\src
+uv run --directory "C:\absolute\path\to\auto_js_reverse" --python 3.12 python -m browser_insight.main
 ```
 
 ## MCP 工具说明
@@ -359,7 +423,9 @@ storage/
 
 默认情况下 MCP 会自动启动 Chrome，无需手动操作。如果自动启动失败，请检查：
 1. 本机是否安装了 Chrome/Chromium/Brave/Edge 浏览器
-2. 端口 9222 是否被其他程序占用（`lsof -i :9222`）
+2. 端口 9222 是否被其他程序占用
+   - macOS / Linux：`lsof -i :9222`
+   - Windows：`netstat -ano | findstr :9222`
 3. 如果关闭了 `auto_launch`，需手动以 `--remote-debugging-port=9222` 参数启动 Chrome
 
 **Q: 模型下载失败或超时**
@@ -373,3 +439,21 @@ storage/
 **Q: Source Map 未还原**
 
 很多生产环境网站不提供 `.map` 文件，此时系统会自动降级为解析混淆代码。搜索结果中会标注来源类型。
+
+**Q: Windows 下 `uv` 命令找不到**
+
+确认已将 uv 添加到系统 PATH。推荐通过官方安装脚本安装：
+
+```powershell
+irm https://astral.sh/uv/install.ps1 | iex
+```
+
+安装后重启终端即可使用。
+
+**Q: Windows 下 PowerShell 执行策略报错**
+
+如果提示 "无法加载文件 .ps1，因为在此系统上禁止运行脚本"，以管理员身份运行：
+
+```powershell
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+```

@@ -4,6 +4,9 @@
 
 采用 **Python Host + Node.js Worker** 混合架构：Python 负责 MCP 通信、CDP 浏览器控制、向量数据库；Node.js 负责 JS AST 解析和 Source Map 还原。
 
+- 仓库地址：https://github.com/hhy5562877/auto_js_reverse
+- 作者：[嚯嚯歪](https://github.com/hhy5562877)（hhy5562877@163.com）
+
 ## 环境要求
 
 | 依赖 | 版本要求 | 说明 |
@@ -122,7 +125,7 @@ git --version
 ### 1. 克隆项目
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/hhy5562877/auto_js_reverse.git
 cd auto_js_reverse
 ```
 
@@ -293,9 +296,11 @@ http://localhost:9222/json
 所有 IDE 均通过 JSON 配置文件接入 MCP 服务器，使用 `uv run` 启动以确保依赖环境正确。
 
 > 以下示例中的路径请替换为你的实际项目绝对路径：
-> - macOS：`/Users/yourname/code/auto_js_reverse`（通过 `pwd` 获取）
-> - Linux：`/home/yourname/code/auto_js_reverse`（通过 `pwd` 获取）
-> - Windows：`C:/Users/YourName/code/auto_js_reverse`（通过 `cd` 获取，JSON 中使用正斜杠 `/` 或双反斜杠 `\\`）
+> - macOS：如 `/Users/yourname/code/auto_js_reverse`（通过 `cd auto_js_reverse && pwd` 获取）
+> - Linux：如 `/home/yourname/code/auto_js_reverse`（通过 `cd auto_js_reverse && pwd` 获取）
+> - Windows：如 `这里填写项目路径`（通过 `cd auto_js_reverse && cd` 获取，JSON 中使用正斜杠 `/` 或双反斜杠 `\\`）
+>
+> 以下示例中所有出现 `这里填写项目路径` 的地方，都需要替换为你的实际路径。
 
 ### Cursor
 
@@ -310,12 +315,12 @@ http://localhost:9222/json
       "command": "uv",
       "args": [
         "run",
-        "--directory", "/absolute/path/to/auto_js_reverse",
+        "--directory", "这里填写项目路径",
         "--python", "3.12",
         "python", "-m", "browser_insight.main"
       ],
       "env": {
-        "PYTHONPATH": "/absolute/path/to/auto_js_reverse/src",
+        "PYTHONPATH": "这里填写项目路径/src",
         "SILICONFLOW_API_KEY": "sk-xxxxxxxxxxxxxxxxxxxxxxxx"
       }
     }
@@ -332,12 +337,12 @@ http://localhost:9222/json
       "command": "uv",
       "args": [
         "run",
-        "--directory", "C:/Users/YourName/code/auto_js_reverse",
+        "--directory", "这里填写项目路径",
         "--python", "3.12",
         "python", "-m", "browser_insight.main"
       ],
       "env": {
-        "PYTHONPATH": "C:/Users/YourName/code/auto_js_reverse/src",
+        "PYTHONPATH": "这里填写项目路径/src",
         "SILICONFLOW_API_KEY": "sk-xxxxxxxxxxxxxxxxxxxxxxxx"
       }
     }
@@ -360,12 +365,12 @@ http://localhost:9222/json
       "command": "uv",
       "args": [
         "run",
-        "--directory", "/absolute/path/to/auto_js_reverse",
+        "--directory", "这里填写项目路径",
         "--python", "3.12",
         "python", "-m", "browser_insight.main"
       ],
       "env": {
-        "PYTHONPATH": "/absolute/path/to/auto_js_reverse/src",
+        "PYTHONPATH": "这里填写项目路径/src",
         "SILICONFLOW_API_KEY": "sk-xxxxxxxxxxxxxxxxxxxxxxxx"
       }
     }
@@ -382,12 +387,12 @@ http://localhost:9222/json
       "command": "uv",
       "args": [
         "run",
-        "--directory", "C:/Users/YourName/code/auto_js_reverse",
+        "--directory", "这里填写项目路径",
         "--python", "3.12",
         "python", "-m", "browser_insight.main"
       ],
       "env": {
-        "PYTHONPATH": "C:/Users/YourName/code/auto_js_reverse/src",
+        "PYTHONPATH": "这里填写项目路径/src",
         "SILICONFLOW_API_KEY": "sk-xxxxxxxxxxxxxxxxxxxxxxxx"
       }
     }
@@ -410,12 +415,12 @@ http://localhost:9222/json
       "command": "uv",
       "args": [
         "run",
-        "--directory", "/absolute/path/to/auto_js_reverse",
+        "--directory", "这里填写项目路径",
         "--python", "3.12",
         "python", "-m", "browser_insight.main"
       ],
       "env": {
-        "PYTHONPATH": "/absolute/path/to/auto_js_reverse/src",
+        "PYTHONPATH": "这里填写项目路径/src",
         "SILICONFLOW_API_KEY": "sk-xxxxxxxxxxxxxxxxxxxxxxxx"
       }
     }
@@ -432,12 +437,12 @@ http://localhost:9222/json
       "command": "uv",
       "args": [
         "run",
-        "--directory", "C:/Users/YourName/code/auto_js_reverse",
+        "--directory", "这里填写项目路径",
         "--python", "3.12",
         "python", "-m", "browser_insight.main"
       ],
       "env": {
-        "PYTHONPATH": "C:/Users/YourName/code/auto_js_reverse/src",
+        "PYTHONPATH": "这里填写项目路径/src",
         "SILICONFLOW_API_KEY": "sk-xxxxxxxxxxxxxxxxxxxxxxxx"
       }
     }
@@ -451,18 +456,18 @@ http://localhost:9222/json
 
 ```bash
 claude mcp add browser-insight \
-  -e PYTHONPATH=/absolute/path/to/auto_js_reverse/src \
+  -e PYTHONPATH=这里填写项目路径/src \
   -e SILICONFLOW_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx \
-  -- uv run --directory /absolute/path/to/auto_js_reverse --python 3.12 python -m browser_insight.main
+  -- uv run --directory 这里填写项目路径 --python 3.12 python -m browser_insight.main
 ```
 
 **Windows (PowerShell):**
 
 ```powershell
 claude mcp add browser-insight `
-  -e PYTHONPATH=C:/Users/YourName/code/auto_js_reverse/src `
+  -e PYTHONPATH=这里填写项目路径/src `
   -e SILICONFLOW_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx `
-  -- uv run --directory C:/Users/YourName/code/auto_js_reverse --python 3.12 python -m browser_insight.main
+  -- uv run --directory 这里填写项目路径 --python 3.12 python -m browser_insight.main
 ```
 
 #### 验证连接
@@ -491,12 +496,12 @@ claude mcp add browser-insight `
       "command": "uv",
       "args": [
         "run",
-        "--directory", "/absolute/path/to/auto_js_reverse",
+        "--directory", "这里填写项目路径",
         "--python", "3.12",
         "python", "-m", "browser_insight.main"
       ],
       "env": {
-        "PYTHONPATH": "/absolute/path/to/auto_js_reverse/src",
+        "PYTHONPATH": "这里填写项目路径/src",
         "SILICONFLOW_API_KEY": "sk-xxxxxxxxxxxxxxxxxxxxxxxx"
       }
     }
@@ -513,12 +518,12 @@ claude mcp add browser-insight `
       "command": "uv",
       "args": [
         "run",
-        "--directory", "C:/Users/YourName/code/auto_js_reverse",
+        "--directory", "这里填写项目路径",
         "--python", "3.12",
         "python", "-m", "browser_insight.main"
       ],
       "env": {
-        "PYTHONPATH": "C:/Users/YourName/code/auto_js_reverse/src",
+        "PYTHONPATH": "这里填写项目路径/src",
         "SILICONFLOW_API_KEY": "sk-xxxxxxxxxxxxxxxxxxxxxxxx"
       }
     }
@@ -538,12 +543,12 @@ claude mcp add browser-insight `
     "browser-insight": {
       "type": "local",
       "command": [
-        "/absolute/path/to/auto_js_reverse/.venv/bin/python",
+        "这里填写项目路径/.venv/bin/python",
         "-m",
         "browser_insight.main"
       ],
       "environment": {
-        "PYTHONPATH": "/absolute/path/to/auto_js_reverse/src",
+        "PYTHONPATH": "这里填写项目路径/src",
         "SILICONFLOW_API_KEY": "sk-xxxxxxxxxxxxxxxxxxxxxxxx"
       },
       "enabled": true
@@ -560,12 +565,12 @@ claude mcp add browser-insight `
     "browser-insight": {
       "type": "local",
       "command": [
-        "C:/Users/YourName/code/auto_js_reverse/.venv/Scripts/python.exe",
+        "这里填写项目路径/.venv/Scripts/python.exe",
         "-m",
         "browser_insight.main"
       ],
       "environment": {
-        "PYTHONPATH": "C:/Users/YourName/code/auto_js_reverse/src",
+        "PYTHONPATH": "这里填写项目路径/src",
         "SILICONFLOW_API_KEY": "sk-xxxxxxxxxxxxxxxxxxxxxxxx"
       },
       "enabled": true
@@ -586,24 +591,24 @@ claude mcp add browser-insight `
 
 ```bash
 SILICONFLOW_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx \
-PYTHONPATH=/absolute/path/to/auto_js_reverse/src \
-uv run --directory /absolute/path/to/auto_js_reverse --python 3.12 python -m browser_insight.main
+PYTHONPATH=这里填写项目路径/src \
+uv run --directory 这里填写项目路径 --python 3.12 python -m browser_insight.main
 ```
 
 **Windows (PowerShell):**
 
 ```powershell
 $env:SILICONFLOW_API_KEY = "sk-xxxxxxxxxxxxxxxxxxxxxxxx"
-$env:PYTHONPATH = "C:\absolute\path\to\auto_js_reverse\src"
-uv run --directory "C:\absolute\path\to\auto_js_reverse" --python 3.12 python -m browser_insight.main
+$env:PYTHONPATH = "这里填写项目路径\src"
+uv run --directory "这里填写项目路径" --python 3.12 python -m browser_insight.main
 ```
 
 **Windows (CMD):**
 
 ```cmd
 set SILICONFLOW_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
-set PYTHONPATH=C:\absolute\path\to\auto_js_reverse\src
-uv run --directory "C:\absolute\path\to\auto_js_reverse" --python 3.12 python -m browser_insight.main
+set PYTHONPATH=这里填写项目路径\src
+uv run --directory "这里填写项目路径" --python 3.12 python -m browser_insight.main
 ```
 
 ## MCP 工具说明

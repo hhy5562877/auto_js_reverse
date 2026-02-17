@@ -1,5 +1,14 @@
 # CHANGELOG
 
+- [2026-02-18 00:10] DOCS: 全面重写 README，完善 macOS/Linux/Windows 三平台部署教程 (Files: README.md, CHANGELOG)
+  - 新增「前置工具安装」章节：macOS (Homebrew)、Linux (Ubuntu/Debian/CentOS/Fedora)、Windows (PowerShell/winget) 详细安装步骤
+  - 环境要求改为表格形式，列出所有依赖及版本要求
+  - Chrome 浏览器章节：新增各平台自动检测路径表格、手动启动增加 Linux 无桌面环境和 Windows PowerShell 命令、新增 CDP 连接验证方法
+  - IDE 配置章节：所有 IDE (Cursor/Windsurf/Claude Code/VS Code/OpenCode) 均提供 macOS+Linux 和 Windows 两套完整配置示例
+  - 常见问题重构为分类结构（连接问题/安装问题/运行问题/Linux 特有/macOS 特有/Windows 特有）
+  - 新增 FAQ：CDP 连接超时排查、setuptools.backends 构建错误、npm install 失败、Docker 部署 Dockerfile 示例
+  - 新增 FAQ：Linux 无桌面环境 Chrome 依赖库安装、macOS Gatekeeper 拦截、macOS lancedb x86_64 兼容
+  - 新增 FAQ：Windows 路径过长、防火墙拦截 CDP 端口、Chrome 闪退排查
 - [2026-02-18 00:00] FIX: 修复 Windows 下 uv run 构建失败的问题 (Files: pyproject.toml, CHANGELOG) [#1]
   - 根因: build-backend 配置为 `setuptools.backends._legacy:_Backend`，该模块为 setuptools 内部实验性 API，多数版本不存在
   - 修复: 改为标准 build-backend `setuptools.build_meta`

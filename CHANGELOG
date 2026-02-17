@@ -1,5 +1,8 @@
 # CHANGELOG
 
+- [2026-02-18 00:00] FIX: 修复 Windows 下 uv run 构建失败的问题 (Files: pyproject.toml, CHANGELOG) [#1]
+  - 根因: build-backend 配置为 `setuptools.backends._legacy:_Backend`，该模块为 setuptools 内部实验性 API，多数版本不存在
+  - 修复: 改为标准 build-backend `setuptools.build_meta`
 - [2026-02-17 23:49] DOCS: 完善 README Windows 部署教程 (Files: README.md, CHANGELOG)
   - 安装步骤新增 Windows PowerShell 和 CMD 两种命令示例（venv 激活、Node.js 依赖安装）
   - 环境变量设置新增 PowerShell `$env:` 和 CMD `set` 语法

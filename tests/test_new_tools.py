@@ -437,6 +437,92 @@ def test_analyze_encryption() -> bool:
         shutil.rmtree(tmp_db, ignore_errors=True)
 
 
+@pytest.mark.unit
+def test_analyze_reverse_targets() -> bool:
+    """测试逆向专题分析模板"""
+    tmp_db = tempfile.mkdtemp(prefix="mcp_test_reverse_targets_")
+    try:
+        idx = IndexManager(tmp_db)
+        fake_vector = [0.1] * 1024
+
+        idx.add_code_chunks([
+            {
+                "vector": fake_vector,
+                "text": "window.getSign = function(params, ts, nonce) { return md5(params + ts + nonce + secret); };",
+                "original_file": "sign.js",
+                "url": "https://test.com/sign.js",
+                "domain": "test.com",
+                "line_start": 1,
+                "line_end": 1,
+                "source_map_restored": True,
+                "file_hash": "b1",
+            },
+            {
+                "vector": fake_vector,
+                "text": "function buildHeaders(token, ts, nonce) { return { 'x-sign': getSign(ts + nonce), 'x-token': token, 'x-timestamp': ts, 'x-nonce': nonce }; }",
+                "original_file": "request.js",
+                "url": "https://test.com/request.js",
+                "domain": "test.com",
+                "line_start": 10,
+                "line_end": 12,
+                "source_map_restored": True,
+                "file_hash": "b2",
+            },
+            {
+                "vector": fake_vector,
+                "text": "const injectToken = (config) => { config.headers.Authorization = 'Bearer ' + localStorage.getItem('token'); return config; };",
+                "original_file": "auth.js",
+                "url": "https://test.com/auth.js",
+                "domain": "test.com",
+                "line_start": 20,
+                "line_end": 20,
+                "source_map_restored": False,
+                "file_hash": "b3",
+            },
+            {
+                "vector": fake_vector,
+                "text": "window.encryptPassword = function(password) { return CryptoJS.AES.encrypt(password, key).toString(); };",
+                "original_file": "crypto.js",
+                "url": "https://test.com/crypto.js",
+                "domain": "test.com",
+                "line_start": 30,
+                "line_end": 30,
+                "source_map_restored": False,
+                "file_hash": "b4",
+            },
+        ])
+
+        class PipelineStub:
+            def __init__(self, index: IndexManager):
+                self.index = index
+
+        import browser_insight.main as main_mod
+
+        original_pipeline = main_mod.pipeline
+        main_mod.pipeline = PipelineStub(idx)
+        try:
+            result = asyncio.run(
+                main_mod.analyze_reverse_targets.fn(domain_filter="test.com")
+            )
+        finally:
+            main_mod.pipeline = original_pipeline
+
+        assert "逆向专题分析" in result
+        assert "## sign" in result
+        assert "## token" in result
+        assert "## encrypt" in result
+        assert "## headers" in result
+        assert "`window.getSign`" in result
+        assert "`window.encryptPassword`" in result
+        assert "`x-sign`" in result
+        assert "`authorization`" in result.lower()
+
+        logger.info("%s analyze_reverse_targets (专题聚类 + hook 候选 + headers)", PASS)
+        return True
+    finally:
+        shutil.rmtree(tmp_db, ignore_errors=True)
+
+
 def main():
     logger.info("=" * 60)
     logger.info("auto_js_reverse 新工具测试")
@@ -462,8 +548,11 @@ def main():
     logger.info("\n--- 6/7 hook_function ---")
     results["hook_function"] = test_hook_function()
 
-    logger.info("\n--- 7/7 analyze_encryption ---")
+    logger.info("\n--- 7/8 analyze_encryption ---")
     results["analyze_encryption"] = test_analyze_encryption()
+
+    logger.info("\n--- 8/8 analyze_reverse_targets ---")
+    results["analyze_reverse_targets"] = test_analyze_reverse_targets()
 
     logger.info("\n" + "=" * 60)
     logger.info("测试结果汇总:")

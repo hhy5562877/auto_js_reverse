@@ -164,6 +164,24 @@
 
 ---
 
+### `analyze_reverse_targets`
+
+| 属性 | 说明 |
+|------|------|
+| 功能 | 按 `sign`、`token`、`encrypt`、`headers` 四类专题扫描代码，输出逆向入口与操作建议 |
+| 类型 | Tool |
+
+**参数:**
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| `domain_filter` | `str` | 否 | 限制扫描的域名 |
+| `focus` | `str` | 否 | 指定专题：`sign`、`token`、`encrypt`、`headers` |
+
+**返回:** 按专题输出代码线索、可疑 Hook 入口、关键请求头和推荐搜索词，便于将搜索、Hook、网络监听串成闭环。
+
+---
+
 ## MCP Resources
 
 ### `insight://archived-sites`
@@ -183,9 +201,10 @@
 
 1. **`capture_current_page`** — 抓取目标页面所有 JS 资源并建立索引
 2. **`list_captured_files`** — 查看抓取到的文件列表
-3. **`analyze_encryption`** — 自动扫描加密模式，快速定位关键代码
-4. **`search_local_codebase`** — 语义搜索特定功能（如 "登录请求签名"）
-5. **`read_js_file`** — 读取完整的加密函数源码
-6. **`capture_network_requests`** — 监听 API 请求，观察加密参数
-7. **`hook_function`** — Hook 加密函数，观察实际输入输出
-8. **`execute_js`** — 在页面中执行代码验证逆向结果
+3. **`analyze_reverse_targets`** — 按专题提炼 sign/token/encrypt/headers 的候选入口
+4. **`analyze_encryption`** — 自动扫描加密模式，快速定位关键代码
+5. **`search_local_codebase`** — 语义搜索特定功能（如 "登录请求签名"）
+6. **`read_js_file`** — 读取完整的加密函数源码
+7. **`capture_network_requests`** — 监听 API 请求，观察加密参数
+8. **`hook_function`** — Hook 加密函数，观察实际输入输出
+9. **`execute_js`** — 在页面中执行代码验证逆向结果

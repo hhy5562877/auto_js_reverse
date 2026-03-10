@@ -10,6 +10,7 @@ from typing import Optional
 from fastmcp import FastMCP
 
 from .services.pipeline import Pipeline
+from .services.reverse_analyzer import ReverseAnalyzer
 
 logger = logging.getLogger(__name__)
 
@@ -540,6 +541,27 @@ async def analyze_encryption(domain_filter: Optional[str] = None) -> str:
         "3. 用 execute_js 在页面中调用加密函数验证"
     )
     return "\n".join(lines)
+
+
+@mcp.tool
+async def analyze_reverse_targets(
+    domain_filter: Optional[str] = None, focus: Optional[str] = None
+) -> str:
+    """按 sign/token/encrypt/headers 四类专题扫描已索引代码，提炼逆向入口。
+    除了返回代码片段，还会输出更适合下一步操作的 Hook 候选函数、关键请求头和推荐搜索词。
+
+    Args:
+        domain_filter: 限制扫描的域名，例如 "www.example.com"
+        focus: 指定专题，可选 sign、token、encrypt、headers。不填则全部扫描
+    """
+    try:
+        analyzer = ReverseAnalyzer(pipeline.index)
+        return analyzer.render_report(domain_filter=domain_filter, focus=focus)
+    except ValueError as e:
+        return f"❌ 参数错误: {e}"
+    except Exception as e:
+        logger.exception("analyze_reverse_targets 异常")
+        return f"❌ 逆向专题分析失败: {e}"
 
 
 @mcp.resource("insight://archived-sites")

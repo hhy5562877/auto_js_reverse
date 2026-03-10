@@ -1,5 +1,7 @@
 # CHANGELOG
 
+- [2026-03-10 13:52] REFACTOR: 将 skill 调整为面向 auto_js_reverse 项目使用的逆向分析技能，并统一项目命名 (Files: skill/auto_js_reverse/SKILL.md, skill/browser-insight-cto/SKILL.md, CHANGELOG)
+- [2026-03-10 13:48] FEAT: 新增仓库审阅与演进规划协作 skill，统一代码审阅与路线设计流程 (Files: skill/browser-insight-cto/SKILL.md, CHANGELOG)
 - [2026-02-18 00:10] DOCS: 全面重写 README，完善 macOS/Linux/Windows 三平台部署教程 (Files: README.md, CHANGELOG)
   - 新增「前置工具安装」章节：macOS (Homebrew)、Linux (Ubuntu/Debian/CentOS/Fedora)、Windows (PowerShell/winget) 详细安装步骤
   - 环境要求改为表格形式，列出所有依赖及版本要求

@@ -182,6 +182,30 @@
 
 ---
 
+### `auto_probe_hook_candidates`
+
+| 属性 | 说明 |
+|------|------|
+| 功能 | 根据专题分析结果自动挑选候选函数并逐个 Hook 试探 |
+| 类型 | Tool |
+
+**参数:**
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| `domain_filter` | `str` | 否 | 限制扫描的域名 |
+| `focus` | `str` | 否 | 指定专题：`sign`、`token`、`encrypt`、`headers` |
+| `target_url` | `str` | 否 | 目标页面 URL |
+| `trigger_action` | `str` | 否 | 每次 Hook 注入后自动执行的 JS 代码，用于触发候选函数 |
+| `max_candidates` | `int` | 否 (默认 `3`) | 最多尝试的候选函数数量 |
+| `max_calls` | `int` | 否 (默认 `5`) | 每个候选函数最多记录多少次调用 |
+| `duration` | `float` | 否 (默认 `8.0`) | 每个候选函数监听时长（秒） |
+| `stop_on_first_hit` | `bool` | 否 (默认 `true`) | 命中第一个有调用记录的候选后是否提前停止 |
+
+**返回:** 候选函数试探记录，包含每个候选的专题来源、位置、关联请求头，以及命中后的参数、返回值和调用栈。
+
+---
+
 ## MCP Resources
 
 ### `insight://archived-sites`
@@ -202,9 +226,10 @@
 1. **`capture_current_page`** — 抓取目标页面所有 JS 资源并建立索引
 2. **`list_captured_files`** — 查看抓取到的文件列表
 3. **`analyze_reverse_targets`** — 按专题提炼 sign/token/encrypt/headers 的候选入口
-4. **`analyze_encryption`** — 自动扫描加密模式，快速定位关键代码
-5. **`search_local_codebase`** — 语义搜索特定功能（如 "登录请求签名"）
-6. **`read_js_file`** — 读取完整的加密函数源码
-7. **`capture_network_requests`** — 监听 API 请求，观察加密参数
-8. **`hook_function`** — Hook 加密函数，观察实际输入输出
-9. **`execute_js`** — 在页面中执行代码验证逆向结果
+4. **`auto_probe_hook_candidates`** — 自动试探候选 Hook 入口，快速验证哪一个真正被调用
+5. **`analyze_encryption`** — 自动扫描加密模式，快速定位关键代码
+6. **`search_local_codebase`** — 语义搜索特定功能（如 "登录请求签名"）
+7. **`read_js_file`** — 读取完整的加密函数源码
+8. **`capture_network_requests`** — 监听 API 请求，观察加密参数
+9. **`hook_function`** — Hook 加密函数，观察实际输入输出
+10. **`execute_js`** — 在页面中执行代码验证逆向结果

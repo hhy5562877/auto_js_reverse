@@ -120,16 +120,7 @@ class ReverseAnalyzer:
     def render_report(
         self, domain_filter: Optional[str] = None, focus: Optional[str] = None
     ) -> str:
-        focus_key = (focus or "").strip().lower() or None
-        if focus_key and focus_key not in REVERSE_TEMPLATES:
-            supported = ", ".join(REVERSE_TEMPLATES.keys())
-            raise ValueError(f"focus 仅支持: {supported}")
-
-        templates = (
-            [REVERSE_TEMPLATES[focus_key]]
-            if focus_key
-            else list(REVERSE_TEMPLATES.values())
-        )
+        templates, focus_key = self._resolve_templates(focus)
 
         sections = []
         for template in templates:
@@ -154,6 +145,69 @@ class ReverseAnalyzer:
             "建议顺序: 先看线索文件，再 Hook 候选函数，最后抓网络请求验证参数与请求头。"
         )
         return "\n".join(header + [""] + sections)
+
+    def collect_hook_candidates(
+        self,
+        domain_filter: Optional[str] = None,
+        focus: Optional[str] = None,
+        limit: int = 5,
+    ) -> list[dict]:
+        templates, _ = self._resolve_templates(focus)
+        candidate_map: dict[str, dict] = {}
+
+        for template in templates:
+            findings = self._collect_findings(template, domain_filter=domain_filter)
+            for finding in findings:
+                for target in finding.get("hook_targets", []):
+                    current = candidate_map.get(target)
+                    candidate_score = int(finding.get("score", 0))
+                    candidate_payload = {
+                        "target": target,
+                        "focuses": [template.name],
+                        "score": candidate_score,
+                        "original_file": finding.get("original_file", ""),
+                        "url": finding.get("url", ""),
+                        "line_start": finding.get("line_start", 0),
+                        "line_end": finding.get("line_end", 0),
+                        "source_map_restored": finding.get("source_map_restored", False),
+                        "headers": list(finding.get("headers", [])),
+                    }
+                    if current is None:
+                        candidate_map[target] = candidate_payload
+                        continue
+
+                    if template.name not in current["focuses"]:
+                        current["focuses"].append(template.name)
+                    current["score"] = max(current["score"], candidate_score)
+                    for header in finding.get("headers", []):
+                        if header not in current["headers"]:
+                            current["headers"].append(header)
+
+        candidates = list(candidate_map.values())
+        candidates.sort(
+            key=lambda item: (
+                int(item.get("score", 0)),
+                bool(item.get("source_map_restored")),
+                item.get("target", ""),
+            ),
+            reverse=True,
+        )
+        return candidates[:limit]
+
+    def _resolve_templates(
+        self, focus: Optional[str]
+    ) -> tuple[list[ReverseTemplate], Optional[str]]:
+        focus_key = (focus or "").strip().lower() or None
+        if focus_key and focus_key not in REVERSE_TEMPLATES:
+            supported = ", ".join(REVERSE_TEMPLATES.keys())
+            raise ValueError(f"focus 仅支持: {supported}")
+
+        templates = (
+            [REVERSE_TEMPLATES[focus_key]]
+            if focus_key
+            else list(REVERSE_TEMPLATES.values())
+        )
+        return templates, focus_key
 
     def _collect_findings(
         self, template: ReverseTemplate, domain_filter: Optional[str]

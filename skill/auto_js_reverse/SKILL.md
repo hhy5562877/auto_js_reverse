@@ -2,7 +2,7 @@
 
 ## 目标
 
-该 skill 用于配合 `auto_js_reverse` 项目执行浏览器 JavaScript 逆向分析，而不是仓库本地开发流程。
+该 skill 用于配合 `auto_js_reverse` 项目执行浏览器 JavaScript 逆向分析。
 
 核心目标：
 

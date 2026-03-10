@@ -30,6 +30,124 @@ pipeline = Pipeline(config=config, base_dir=BASE_DIR)
 mcp = FastMCP(name="auto_js_reverse")
 
 
+def _build_hook_js(function_path: str, max_calls: int) -> str:
+    safe_path = function_path.replace("'", "\\'")
+    return (
+        """
+    (function() {
+        var _hookedCalls = [];
+        var _maxCalls = """
+        + str(max_calls)
+        + """;
+        var _target;
+        try { _target = """
+        + function_path
+        + """; } catch(e) {
+            return JSON.stringify({error: '"""
+        + safe_path
+        + """ 不存在: ' + e.message});
+        }
+        if (typeof _target !== 'function') {
+            return JSON.stringify({error: '"""
+        + safe_path
+        + """ 不是函数'});
+        }
+        var _original = _target;
+        var _parts = '"""
+        + safe_path
+        + """'.split('.');
+        var _parent = _parts.length > 1
+            ? _parts.slice(0, -1).reduce(function(o, k) { return o[k]; }, window)
+            : window;
+        var _key = _parts[_parts.length - 1];
+
+        _parent[_key] = function() {
+            var args = Array.prototype.slice.call(arguments);
+            var callInfo = {
+                args: args.map(function(a) {
+                    try { return JSON.stringify(a).substring(0, 500); }
+                    catch(e) { return String(a).substring(0, 500); }
+                }),
+                stack: new Error().stack.split('\\n').slice(1, 6).map(function(s) { return s.trim(); }),
+            };
+            var result = _original.apply(this, arguments);
+            try { callInfo.returnValue = JSON.stringify(result).substring(0, 500); }
+            catch(e) { callInfo.returnValue = String(result).substring(0, 500); }
+            if (_hookedCalls.length < _maxCalls) _hookedCalls.push(callInfo);
+            return result;
+        };
+
+        window.__browserInsightHook = {
+            calls: _hookedCalls,
+            restore: function() { _parent[_key] = _original; },
+        };
+        return JSON.stringify({status: 'hooked', target: '"""
+        + safe_path
+        + """'});
+    })()
+    """
+    )
+
+
+async def _run_hook_capture(
+    function_path: str,
+    target_url: Optional[str],
+    trigger_action: Optional[str],
+    max_calls: int,
+    duration: float,
+) -> dict:
+    try:
+        await pipeline._browser.ensure_connected(target_url=target_url)
+        hook_result = await pipeline._browser.evaluate(
+            _build_hook_js(function_path=function_path, max_calls=max_calls)
+        )
+    except Exception as e:
+        return {"status": "error", "message": f"❌ Hook 失败: {e}"}
+
+    parsed = json.loads(hook_result) if isinstance(hook_result, str) else hook_result
+    if isinstance(parsed, dict) and parsed.get("error"):
+        return {"status": "error", "message": f"❌ {parsed['error']}"}
+
+    if trigger_action:
+        try:
+            await pipeline._browser.evaluate(trigger_action)
+        except Exception as e:
+            logger.warning("trigger_action 执行失败: %s", e)
+
+    await asyncio.sleep(max(duration, 0.0))
+
+    try:
+        calls_raw = await pipeline._browser.evaluate(
+            "JSON.stringify(window.__browserInsightHook ? window.__browserInsightHook.calls : [])"
+        )
+        await pipeline._browser.evaluate(
+            "window.__browserInsightHook && window.__browserInsightHook.restore()"
+        )
+    except Exception as e:
+        return {"status": "error", "message": f"❌ 获取 Hook 结果失败: {e}"}
+
+    calls = json.loads(calls_raw) if isinstance(calls_raw, str) else calls_raw
+    return {"status": "ok", "calls": calls or []}
+
+
+def _format_hook_output(function_path: str, calls: list[dict], duration: float) -> str:
+    if not calls:
+        return f"在 {duration} 秒内 `{function_path}` 未被调用。尝试在页面上触发相关操作。"
+
+    lines = [f"🪝 `{function_path}` 被调用 {len(calls)} 次 ({duration}s)\n"]
+    for i, call in enumerate(calls, 1):
+        lines.append(f"### 调用 {i}")
+        lines.append(f"- 参数: {', '.join(call.get('args', []))}")
+        lines.append(f"- 返回值: {call.get('returnValue', 'undefined')}")
+        stack = call.get("stack", [])
+        if stack:
+            lines.append("- 调用栈:")
+            for s in stack[:5]:
+                lines.append(f"  - `{s}`")
+
+    return "\n".join(lines)
+
+
 @mcp.tool
 async def capture_current_page(
     storage_path: str, target_url: Optional[str] = None, force_refresh: bool = False
@@ -365,109 +483,20 @@ async def hook_function(
         max_calls: 最多记录多少次调用，默认 10
         duration: 监听时长（秒），默认 15 秒
     """
-    safe_path = function_path.replace("'", "\\'")
-    hook_js = (
-        """
-    (function() {
-        var _hookedCalls = [];
-        var _maxCalls = """
-        + str(max_calls)
-        + """;
-        var _target;
-        try { _target = """
-        + function_path
-        + """; } catch(e) {
-            return JSON.stringify({error: '"""
-        + safe_path
-        + """ 不存在: ' + e.message});
-        }
-        if (typeof _target !== 'function') {
-            return JSON.stringify({error: '"""
-        + safe_path
-        + """ 不是函数'});
-        }
-        var _original = _target;
-        var _parts = '"""
-        + safe_path
-        + """'.split('.');
-        var _parent = _parts.length > 1
-            ? _parts.slice(0, -1).reduce(function(o, k) { return o[k]; }, window)
-            : window;
-        var _key = _parts[_parts.length - 1];
-
-        _parent[_key] = function() {
-            var args = Array.prototype.slice.call(arguments);
-            var callInfo = {
-                args: args.map(function(a) {
-                    try { return JSON.stringify(a).substring(0, 500); }
-                    catch(e) { return String(a).substring(0, 500); }
-                }),
-                stack: new Error().stack.split('\\n').slice(1, 6).map(function(s) { return s.trim(); }),
-            };
-            var result = _original.apply(this, arguments);
-            try { callInfo.returnValue = JSON.stringify(result).substring(0, 500); }
-            catch(e) { callInfo.returnValue = String(result).substring(0, 500); }
-            if (_hookedCalls.length < _maxCalls) _hookedCalls.push(callInfo);
-            return result;
-        };
-
-        window.__browserInsightHook = {
-            calls: _hookedCalls,
-            restore: function() { _parent[_key] = _original; },
-        };
-        return JSON.stringify({status: 'hooked', target: '"""
-        + safe_path
-        + """'});
-    })()
-    """
+    result = await _run_hook_capture(
+        function_path=function_path,
+        target_url=target_url,
+        trigger_action=trigger_action,
+        max_calls=max_calls,
+        duration=duration,
     )
-
-    try:
-        await pipeline._browser.ensure_connected(target_url=target_url)
-        hook_result = await pipeline._browser.evaluate(hook_js)
-    except Exception as e:
-        return f"❌ Hook 失败: {e}"
-
-    parsed = json.loads(hook_result) if isinstance(hook_result, str) else hook_result
-    if isinstance(parsed, dict) and parsed.get("error"):
-        return f"❌ {parsed['error']}"
-
-    if trigger_action:
-        try:
-            await pipeline._browser.evaluate(trigger_action)
-        except Exception as e:
-            logger.warning("trigger_action 执行失败: %s", e)
-
-    await asyncio.sleep(duration)
-
-    try:
-        calls_raw = await pipeline._browser.evaluate(
-            "JSON.stringify(window.__browserInsightHook ? window.__browserInsightHook.calls : [])"
-        )
-        await pipeline._browser.evaluate(
-            "window.__browserInsightHook && window.__browserInsightHook.restore()"
-        )
-    except Exception as e:
-        return f"❌ 获取 Hook 结果失败: {e}"
-
-    calls = json.loads(calls_raw) if isinstance(calls_raw, str) else calls_raw
-    if not calls:
-        return (
-            f"在 {duration} 秒内 `{function_path}` 未被调用。尝试在页面上触发相关操作。"
-        )
-
-    lines = [f"🪝 `{function_path}` 被调用 {len(calls)} 次 ({duration}s)\n"]
-    for i, call in enumerate(calls, 1):
-        lines.append(f"### 调用 {i}")
-        lines.append(f"- 参数: {', '.join(call.get('args', []))}")
-        lines.append(f"- 返回值: {call.get('returnValue', 'undefined')}")
-        stack = call.get("stack", [])
-        if stack:
-            lines.append("- 调用栈:")
-            for s in stack[:5]:
-                lines.append(f"  - `{s}`")
-
-    return "\n".join(lines)
+    if result["status"] == "error":
+        return str(result["message"])
+    return _format_hook_output(
+        function_path=function_path,
+        calls=list(result.get("calls", [])),
+        duration=duration,
+    )
 
 
 ENCRYPTION_PATTERNS = {
@@ -562,6 +591,108 @@ async def analyze_reverse_targets(
     except Exception as e:
         logger.exception("analyze_reverse_targets 异常")
         return f"❌ 逆向专题分析失败: {e}"
+
+
+@mcp.tool
+async def auto_probe_hook_candidates(
+    domain_filter: Optional[str] = None,
+    focus: Optional[str] = None,
+    target_url: Optional[str] = None,
+    trigger_action: Optional[str] = None,
+    max_candidates: int = 3,
+    max_calls: int = 5,
+    duration: float = 8.0,
+    stop_on_first_hit: bool = True,
+) -> str:
+    """根据逆向专题分析结果自动挑选候选函数并逐个 Hook 试探。
+    适合在已经完成 capture_current_page 后，快速验证 sign/token/encrypt/headers 入口。
+
+    Args:
+        domain_filter: 限制扫描的域名
+        focus: 指定专题，可选 sign、token、encrypt、headers
+        target_url: 目标页面 URL（可选）
+        trigger_action: 每次 Hook 注入后执行的 JS，用于触发候选函数
+        max_candidates: 最多尝试多少个候选函数
+        max_calls: 每个候选函数最多记录多少次调用
+        duration: 每个候选函数监听时长（秒）
+        stop_on_first_hit: 命中第一个有调用记录的候选后是否立即停止
+    """
+    try:
+        analyzer = ReverseAnalyzer(pipeline.index)
+        candidates = analyzer.collect_hook_candidates(
+            domain_filter=domain_filter,
+            focus=focus,
+            limit=max_candidates,
+        )
+    except ValueError as e:
+        return f"❌ 参数错误: {e}"
+    except Exception as e:
+        logger.exception("auto_probe_hook_candidates 异常")
+        return f"❌ 候选 Hook 分析失败: {e}"
+
+    if not candidates:
+        return (
+            "未找到可自动试探的 Hook 候选函数。\n"
+            "建议先执行 analyze_reverse_targets 查看专题线索，或补充抓取与索引。"
+        )
+
+    lines = [
+        f"🎯 候选 Hook 试探 (共 {len(candidates)} 个候选)\n",
+        f"- 范围: `{domain_filter}`" if domain_filter else "- 范围: 全部域名",
+        f"- 专题: `{focus}`" if focus else "- 专题: 自动",
+    ]
+
+    hits = 0
+    for idx, candidate in enumerate(candidates, 1):
+        lines.append(
+            f"\n## 候选 {idx}: `{candidate['target']}`\n"
+            f"- 专题: {', '.join(candidate.get('focuses', []))}\n"
+            f"- 文件: `{candidate.get('original_file', '?')}`\n"
+            f"- 位置: {candidate.get('line_start', '?')}-{candidate.get('line_end', '?')}\n"
+            f"- 来源: `{candidate.get('url', '')}`"
+        )
+        if candidate.get("headers"):
+            lines.append(
+                "- 关联请求头: "
+                + ", ".join(f"`{header}`" for header in candidate["headers"])
+            )
+
+        result = await _run_hook_capture(
+            function_path=str(candidate["target"]),
+            target_url=target_url,
+            trigger_action=trigger_action,
+            max_calls=max_calls,
+            duration=duration,
+        )
+        if result["status"] == "error":
+            lines.append(str(result["message"]))
+            continue
+
+        calls = list(result.get("calls", []))
+        if not calls:
+            lines.append(f"在 {duration} 秒内未命中调用。")
+            continue
+
+        hits += 1
+        lines.append(f"✅ 命中 {len(calls)} 次调用")
+        lines.append(
+            _format_hook_output(
+                function_path=str(candidate["target"]),
+                calls=calls,
+                duration=duration,
+            )
+        )
+        if stop_on_first_hit:
+            lines.append("\n已命中候选入口，按 stop_on_first_hit 提前结束。")
+            break
+
+    if hits == 0:
+        lines.append(
+            "\n未命中任何候选入口。建议提供更具体的 trigger_action，或先用 "
+            "capture_network_requests 确认触发链路。"
+        )
+
+    return "\n".join(lines)
 
 
 @mcp.resource("insight://archived-sites")

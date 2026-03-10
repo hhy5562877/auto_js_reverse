@@ -523,6 +523,90 @@ def test_analyze_reverse_targets() -> bool:
         shutil.rmtree(tmp_db, ignore_errors=True)
 
 
+@pytest.mark.unit
+def test_auto_probe_hook_candidates() -> bool:
+    """测试自动候选 Hook 试探"""
+    tmp_db = tempfile.mkdtemp(prefix="mcp_test_auto_probe_")
+    try:
+        idx = IndexManager(tmp_db)
+        fake_vector = [0.1] * 1024
+        idx.add_code_chunks([
+            {
+                "vector": fake_vector,
+                "text": "window.getSign = function(params, ts, nonce) { return md5(params + ts + nonce + secret); };",
+                "original_file": "sign.js",
+                "url": "https://test.com/sign.js",
+                "domain": "test.com",
+                "line_start": 1,
+                "line_end": 1,
+                "source_map_restored": True,
+                "file_hash": "c1",
+            }
+        ])
+
+        class BrowserStub:
+            def __init__(self):
+                self.current_target = ""
+
+            async def ensure_connected(self, target_url: str = None) -> None:
+                return None
+
+            async def evaluate(self, expression: str):
+                if "window.getSign" in expression and "__browserInsightHook" in expression:
+                    self.current_target = "window.getSign"
+                    return json.dumps({"status": "hooked", "target": "window.getSign"})
+                if expression == "window.login()":
+                    return None
+                if "JSON.stringify(window.__browserInsightHook" in expression:
+                    return json.dumps(
+                        [
+                            {
+                                "args": ['"abc"', '"123"', '"nonce"'],
+                                "returnValue": '"sig123"',
+                                "stack": ["at window.getSign (<anonymous>:1:1)"],
+                            }
+                        ]
+                    )
+                if "window.__browserInsightHook && window.__browserInsightHook.restore()" in expression:
+                    return None
+                raise AssertionError(f"收到未预期的表达式: {expression}")
+
+        class PipelineStub:
+            def __init__(self, index: IndexManager):
+                self.index = index
+                self._browser = BrowserStub()
+
+        import browser_insight.main as main_mod
+
+        original_pipeline = main_mod.pipeline
+        main_mod.pipeline = PipelineStub(idx)
+        try:
+            result = asyncio.run(
+                main_mod.auto_probe_hook_candidates.fn(
+                    domain_filter="test.com",
+                    focus="sign",
+                    trigger_action="window.login()",
+                    max_candidates=2,
+                    max_calls=3,
+                    duration=0.0,
+                    stop_on_first_hit=True,
+                )
+            )
+        finally:
+            main_mod.pipeline = original_pipeline
+
+        assert "候选 Hook 试探" in result
+        assert "`window.getSign`" in result
+        assert "✅ 命中 1 次调用" in result
+        assert "sig123" in result
+        assert "已命中候选入口" in result
+
+        logger.info("%s auto_probe_hook_candidates (自动候选 Hook 试探)", PASS)
+        return True
+    finally:
+        shutil.rmtree(tmp_db, ignore_errors=True)
+
+
 def main():
     logger.info("=" * 60)
     logger.info("auto_js_reverse 新工具测试")
@@ -548,11 +632,14 @@ def main():
     logger.info("\n--- 6/7 hook_function ---")
     results["hook_function"] = test_hook_function()
 
-    logger.info("\n--- 7/8 analyze_encryption ---")
+    logger.info("\n--- 7/9 analyze_encryption ---")
     results["analyze_encryption"] = test_analyze_encryption()
 
-    logger.info("\n--- 8/8 analyze_reverse_targets ---")
+    logger.info("\n--- 8/9 analyze_reverse_targets ---")
     results["analyze_reverse_targets"] = test_analyze_reverse_targets()
+
+    logger.info("\n--- 9/9 auto_probe_hook_candidates ---")
+    results["auto_probe_hook_candidates"] = test_auto_probe_hook_candidates()
 
     logger.info("\n" + "=" * 60)
     logger.info("测试结果汇总:")

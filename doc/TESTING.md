@@ -31,6 +31,13 @@ python scripts/check_test_env.py --level e2e
 python -m pytest -m e2e
 ```
 
+### 一次跑完整测试分层
+
+```bash
+python scripts/check_test_env.py --level all
+python scripts/run_tests.py --level all
+```
+
 ## 推荐脚本入口
 
 如果你希望把环境检查和测试执行串起来，优先使用：
@@ -39,6 +46,7 @@ python -m pytest -m e2e
 python scripts/run_tests.py --level unit
 python scripts/run_tests.py --level integration
 python scripts/run_tests.py --level e2e
+python scripts/run_tests.py --level all
 ```
 
 传递额外 pytest 参数示例：

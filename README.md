@@ -677,6 +677,7 @@ python -m pytest -m e2e
 python scripts/run_tests.py --level unit
 python scripts/run_tests.py --level integration
 python scripts/run_tests.py --level e2e
+python scripts/run_tests.py --level all
 ```
 
 更完整的测试说明见 [doc/TESTING.md](doc/TESTING.md)。

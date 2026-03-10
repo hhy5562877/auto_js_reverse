@@ -1,5 +1,5 @@
 /**
- * Browser Insight Node.js Worker - JS 解析与 Source Map 还原
+ * auto_js_reverse Node.js Worker - JS 解析与 Source Map 还原
  *
  * 通信协议: stdin/stdout JSON 行协议
  * 输入: { "command": "parse", "files": [...] }

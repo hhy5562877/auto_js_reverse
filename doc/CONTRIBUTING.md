@@ -63,6 +63,8 @@ docs(roadmap): add project milestones and delivery phases
 - 纯逻辑优先写成不依赖浏览器和外部 API 的测试
 - 真实页面、真实网络、真实 Key 的测试应视为集成或 E2E
 - 不要让基础测试依赖 fenbi、baidu、Chrome 实例才能运行
+- 使用 `pytest` marker 区分 `unit`、`integration`、`e2e`
+- 提交前至少跑通本次改动相关的 `unit` 测试
 
 ## 推荐分层
 

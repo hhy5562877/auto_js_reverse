@@ -7,9 +7,14 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from browser_insight.services.pipeline import Pipeline
+
+
+pytestmark = pytest.mark.unit
 
 
 class FakeEmbeddingService:

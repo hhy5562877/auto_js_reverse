@@ -8,6 +8,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from browser_insight.services.browser_connector import (
@@ -31,6 +33,8 @@ TARGET_URL = "https://www.baidu.com"
 
 PASS = "✅ PASS"
 FAIL = "❌ FAIL"
+
+pytestmark = pytest.mark.e2e
 
 
 def load_config() -> dict:
@@ -248,7 +252,7 @@ def test_full_pipeline_baidu() -> bool:
 
 def main():
     logger.info("=" * 60)
-    logger.info("Browser Insight MCP 端到端测试")
+    logger.info("auto_js_reverse 端到端测试")
     logger.info("目标: %s", TARGET_URL)
     logger.info("=" * 60)
 

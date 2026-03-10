@@ -8,6 +8,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+import pytest
+
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
 from browser_insight.services.browser_connector import BrowserConnector
@@ -42,6 +44,7 @@ def ensure_test_config(config: dict) -> dict:
     return config
 
 
+@pytest.mark.unit
 def test_list_captured_files() -> bool:
     """测试 IndexManager.list_files_by_domain 和 get_file_by_url"""
     tmp_db = tempfile.mkdtemp(prefix="mcp_test_list_")
@@ -90,6 +93,7 @@ def test_list_captured_files() -> bool:
         shutil.rmtree(tmp_db, ignore_errors=True)
 
 
+@pytest.mark.unit
 def test_search_chunks_by_text() -> bool:
     """测试 IndexManager.search_chunks_by_text"""
     tmp_db = tempfile.mkdtemp(prefix="mcp_test_search_text_")
@@ -150,6 +154,7 @@ def test_search_chunks_by_text() -> bool:
         shutil.rmtree(tmp_db, ignore_errors=True)
 
 
+@pytest.mark.unit
 def test_read_js_file() -> bool:
     """测试读取 JS 文件（行范围）"""
     tmp_file = Path(tempfile.mktemp(suffix=".js"))
@@ -172,6 +177,7 @@ def test_read_js_file() -> bool:
         tmp_file.unlink(missing_ok=True)
 
 
+@pytest.mark.integration
 def test_execute_js() -> bool:
     """测试在浏览器中执行 JS 表达式"""
     config = ensure_test_config(load_config())
@@ -219,6 +225,7 @@ def test_execute_js() -> bool:
     return True
 
 
+@pytest.mark.integration
 def test_capture_network() -> bool:
     """测试网络请求捕获"""
     config = ensure_test_config(load_config())
@@ -256,6 +263,7 @@ def test_capture_network() -> bool:
     return True
 
 
+@pytest.mark.integration
 def test_hook_function() -> bool:
     """测试 Hook 函数"""
     config = ensure_test_config(load_config())
@@ -328,6 +336,7 @@ def test_hook_function() -> bool:
     return True
 
 
+@pytest.mark.unit
 def test_analyze_encryption() -> bool:
     """测试加密模式扫描"""
     tmp_db = tempfile.mkdtemp(prefix="mcp_test_encrypt_")
@@ -430,7 +439,7 @@ def test_analyze_encryption() -> bool:
 
 def main():
     logger.info("=" * 60)
-    logger.info("Browser Insight MCP 新工具测试")
+    logger.info("auto_js_reverse 新工具测试")
     logger.info("=" * 60)
 
     results: dict[str, bool] = {}

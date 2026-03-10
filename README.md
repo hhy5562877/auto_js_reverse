@@ -1,4 +1,4 @@
-# Browser Insight Hybrid MCP
+# auto_js_reverse
 
 本地化浏览器 JS 抓取、Source Map 高保真还原、增量 RAG 索引的 MCP 服务器。
 
@@ -136,7 +136,7 @@ cd auto_js_reverse
 ```bash
 uv venv --python 3.12 .venv
 source .venv/bin/activate
-uv pip install fastmcp websockets lancedb fastembed pyarrow aiohttp numpy
+uv pip install fastmcp websockets lancedb pyarrow aiohttp numpy
 ```
 
 **Windows (PowerShell):**
@@ -144,7 +144,7 @@ uv pip install fastmcp websockets lancedb fastembed pyarrow aiohttp numpy
 ```powershell
 uv venv --python 3.12 .venv
 .venv\Scripts\Activate.ps1
-uv pip install fastmcp websockets lancedb fastembed pyarrow aiohttp numpy
+uv pip install fastmcp websockets lancedb pyarrow aiohttp numpy
 ```
 
 **Windows (CMD):**
@@ -152,7 +152,7 @@ uv pip install fastmcp websockets lancedb fastembed pyarrow aiohttp numpy
 ```cmd
 uv venv --python 3.12 .venv
 .venv\Scripts\activate.bat
-uv pip install fastmcp websockets lancedb fastembed pyarrow aiohttp numpy
+uv pip install fastmcp websockets lancedb pyarrow aiohttp numpy
 ```
 
 ### 3. 安装 Node.js 依赖
@@ -172,6 +172,19 @@ cd src\browser_insight\node_worker
 npm install
 cd ..\..\..
 ```
+
+### 3.1 推荐同步依赖
+
+如果你希望直接按项目声明安装依赖，而不是手动逐个安装，推荐使用：
+
+```bash
+uv sync --extra dev
+```
+
+说明：
+
+- 当前项目将 `lancedb` 约束在兼容范围内，避免 `macOS x86_64` 上 `uv run` 解析到不可安装版本
+- 若你只运行服务，不跑测试，可以不安装 `dev` 依赖
 
 ### 4. 配置硅基流动 API Key
 
@@ -311,7 +324,7 @@ http://localhost:9222/json
 ```json
 {
   "mcpServers": {
-    "browser-insight": {
+    "auto-js-reverse": {
       "command": "uv",
       "args": [
         "run",
@@ -333,7 +346,7 @@ http://localhost:9222/json
 ```json
 {
   "mcpServers": {
-    "browser-insight": {
+    "auto-js-reverse": {
       "command": "uv",
       "args": [
         "run",
@@ -361,7 +374,7 @@ http://localhost:9222/json
 ```json
 {
   "mcpServers": {
-    "browser-insight": {
+    "auto-js-reverse": {
       "command": "uv",
       "args": [
         "run",
@@ -383,7 +396,7 @@ http://localhost:9222/json
 ```json
 {
   "mcpServers": {
-    "browser-insight": {
+    "auto-js-reverse": {
       "command": "uv",
       "args": [
         "run",
@@ -411,7 +424,7 @@ http://localhost:9222/json
 ```json
 {
   "mcpServers": {
-    "browser-insight": {
+    "auto-js-reverse": {
       "command": "uv",
       "args": [
         "run",
@@ -433,7 +446,7 @@ http://localhost:9222/json
 ```json
 {
   "mcpServers": {
-    "browser-insight": {
+    "auto-js-reverse": {
       "command": "uv",
       "args": [
         "run",
@@ -455,7 +468,7 @@ http://localhost:9222/json
 **macOS / Linux:**
 
 ```bash
-claude mcp add browser-insight \
+claude mcp add auto-js-reverse \
   -e PYTHONPATH=这里填写项目路径/src \
   -e SILICONFLOW_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx \
   -- uv run --directory 这里填写项目路径 --python 3.12 python -m browser_insight.main
@@ -464,7 +477,7 @@ claude mcp add browser-insight \
 **Windows (PowerShell):**
 
 ```powershell
-claude mcp add browser-insight `
+claude mcp add auto-js-reverse `
   -e PYTHONPATH=这里填写项目路径/src `
   -e SILICONFLOW_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx `
   -- uv run --directory 这里填写项目路径 --python 3.12 python -m browser_insight.main
@@ -478,7 +491,7 @@ claude mcp add browser-insight `
 /mcp
 ```
 
-应能看到 `browser-insight` 服务器状态为已连接，并列出以下工具：
+应能看到 `auto-js-reverse` 服务器状态为已连接，并列出以下工具：
 
 - `capture_current_page` - 抓取当前页面 JS 资源
 - `search_local_codebase` - RAG 语义检索代码
@@ -492,7 +505,7 @@ claude mcp add browser-insight `
 ```json
 {
   "servers": {
-    "browser-insight": {
+    "auto-js-reverse": {
       "command": "uv",
       "args": [
         "run",
@@ -514,7 +527,7 @@ claude mcp add browser-insight `
 ```json
 {
   "servers": {
-    "browser-insight": {
+    "auto-js-reverse": {
       "command": "uv",
       "args": [
         "run",
@@ -540,7 +553,7 @@ claude mcp add browser-insight `
 ```json
 {
   "mcp": {
-    "browser-insight": {
+    "auto-js-reverse": {
       "type": "local",
       "command": [
         "这里填写项目路径/.venv/bin/python",
@@ -562,7 +575,7 @@ claude mcp add browser-insight `
 ```json
 {
   "mcp": {
-    "browser-insight": {
+    "auto-js-reverse": {
       "type": "local",
       "command": [
         "这里填写项目路径/.venv/Scripts/python.exe",
@@ -621,7 +634,7 @@ uv run --directory "这里填写项目路径" --python 3.12 python -m browser_in
 2. SHA-256 哈希去重，跳过已索引文件
 3. 下载 JS 文件和对应的 Source Map
 4. Node.js Worker 进行 Source Map 还原 + AST 语义切分
-5. FastEmbed 向量化后写入 LanceDB
+5. 调用远程 Embedding API 向量化后写入 LanceDB
 
 参数：
 - `force_refresh` (bool, 默认 false) - 忽略缓存，强制重新解析
@@ -639,6 +652,24 @@ uv run --directory "这里填写项目路径" --python 3.12 python -m browser_in
 
 Resource 类型，列出所有已归档的域名和统计信息。
 
+## 测试
+
+项目测试按三层划分：
+
+- `unit`：纯逻辑测试
+- `integration`：本地集成测试
+- `e2e`：真实网页端到端测试
+
+推荐命令：
+
+```bash
+python -m pytest -m unit
+python -m pytest -m integration
+python -m pytest -m e2e
+```
+
+更完整的测试说明见 [doc/TESTING.md](doc/TESTING.md)。
+
 ## 配置文件
 
 配置文件位于 `.mcp_config/config.json`，可调整：
@@ -651,7 +682,6 @@ Resource 类型，列出所有已归档的域名和统计信息。
 | `chrome_cdp.user_data_dir` | Chrome 用户数据目录 | storage/chrome_profile |
 | `storage.base_dir` | JS 文件归档目录 | storage/archives |
 | `storage.db_dir` | LanceDB 数据库目录 | storage/db |
-| `storage.model_dir` | Embedding 模型缓存目录 | storage/models |
 | `pipeline.max_concurrent_downloads` | 并发下载数 | 5 |
 | `pipeline.max_file_size_bytes` | 单文件大小上限（超过则降级为行切分） | 5MB |
 | `embedding.model_name` | Embedding 模型 | BAAI/bge-small-en-v1.5 |
@@ -664,19 +694,18 @@ Resource 类型，列出所有已归档的域名和统计信息。
 
 ```
 storage/
-├── archives/                    # JS 文件归档（按日期/域名/原始路径）
+├── archives/                    # JS 文件归档（按日期/域名/会话时间/原始路径）
 │   └── 2026-02-16/
 │       └── www.example.com/
-│           ├── index.html
-│           ├── metadata.json
-│           └── static/js/
-│               ├── app.abc123.js
-│               └── app.abc123.js.map
+│           └── 143012-123456/
+│               ├── index.html
+│               ├── metadata.json
+│               └── static/js/
+│                   ├── app.abc123.js
+│                   └── app.abc123.js.map
 ├── db/                          # LanceDB 向量数据库
 │   ├── file_index.lance/
 │   └── code_chunks.lance/
-├── models/                      # Embedding 模型缓存 (ONNX)
-│   └── BAAI--bge-small-en-v1.5/
 └── chrome_profile/              # Chrome 用户数据（自动启动时使用）
 ```
 

@@ -1,14 +1,13 @@
 [project]
-name = "browser-insight-mcp"
+name = "auto-js-reverse"
 version = "1.0.0"
-description = "Browser Insight Hybrid MCP - 浏览器代码分析引擎 (Python Host + Node.js Worker)"
+description = "auto_js_reverse - 浏览器 JavaScript 逆向分析 MCP (Python Host + Node.js Worker)"
 requires-python = ">=3.10"
 dependencies = [
     "fastmcp>=2.0.0",
     "websockets>=12.0",
     "aiohttp>=3.9.0",
-    "lancedb>=0.6.0",
-    "fastembed>=0.3.0",
+    "lancedb>=0.25.3,<0.26.0",
     "pyarrow>=14.0.0",
 ]
 
@@ -19,7 +18,7 @@ dev = [
 ]
 
 [project.scripts]
-browser-insight = "browser_insight.main:main"
+auto-js-reverse = "browser_insight.main:main"
 
 [build-system]
 requires = ["setuptools>=68.0"]
@@ -27,3 +26,14 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "unit: 纯逻辑测试，不依赖真实浏览器、真实网络或外部 API",
+    "integration: 集成测试，可能依赖本地浏览器、Node Worker 或本地配置",
+    "e2e: 端到端测试，依赖真实网页、真实环境与完整链路",
+]
+filterwarnings = [
+    "ignore::pytest.PytestReturnNotNoneWarning",
+]

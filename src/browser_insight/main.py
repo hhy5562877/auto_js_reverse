@@ -26,7 +26,7 @@ def _load_config() -> dict:
 config = _load_config()
 pipeline = Pipeline(config=config, base_dir=BASE_DIR)
 
-mcp = FastMCP(name="Browser Insight MCP")
+mcp = FastMCP(name="auto_js_reverse")
 
 
 @mcp.tool

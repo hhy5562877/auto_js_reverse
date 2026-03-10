@@ -1,1 +1,1 @@
-"""Browser Insight Hybrid MCP - 浏览器代码分析引擎"""
+"""auto_js_reverse - 浏览器 JavaScript 逆向分析 MCP"""

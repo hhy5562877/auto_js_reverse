@@ -34,12 +34,10 @@ storage/
 # MCP 配置文件 (含敏感 API Key，仅追踪 .template 模板)
 .mcp_config/config.json
 
-# 测试文件
-tests/
-
 # 测试临时文件
 /tmp_test_storage/
 tests/tmp_*/
+tests/__pycache__/
 
 # Chrome 用户数据
 .browser_insight/

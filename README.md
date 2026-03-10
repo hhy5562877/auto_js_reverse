@@ -491,10 +491,14 @@ claude mcp add auto-js-reverse `
 /mcp
 ```
 
-应能看到 `auto-js-reverse` 服务器状态为已连接，并列出以下工具：
+应能看到 `auto-js-reverse` 服务器状态为已连接，并列出工具集合，例如：
 
 - `capture_current_page` - 抓取当前页面 JS 资源
 - `search_local_codebase` - RAG 语义检索代码
+- `analyze_reverse_targets` - 提炼 sign/token/encrypt/headers 候选入口
+- `auto_probe_hook_candidates` - 自动试探候选 Hook 入口
+- `correlate_request_flow` - 将真实请求和代码线索自动对齐
+- `generate_verification_actions` - 生成下一步验证动作
 
 ### VS Code (Copilot)
 
@@ -594,7 +598,7 @@ claude mcp add auto-js-reverse `
 
 > 注意：OpenCode 1.2+ 使用 `mcp` 字段（不是 `mcpServers`），`command` 必须是字符串数组，环境变量使用 `environment` 对象。
 
-启动 OpenCode 后，MCP 工具会自动加载，可直接在对话中使用 `capture_current_page` 和 `search_local_codebase`。
+启动 OpenCode 后，MCP 工具会自动加载，可直接在对话中使用 `capture_current_page`、`analyze_reverse_targets`、`correlate_request_flow` 等工具。
 
 ### 其他 MCP 客户端
 
@@ -648,9 +652,108 @@ uv run --directory "这里填写项目路径" --python 3.12 python -m browser_in
 - `domain_filter` (string, 可选) - 限定搜索域名
 - `limit` (int, 默认 10) - 返回结果数
 
+### `list_captured_files` / `read_js_file`
+
+用于查看当前已抓取文件，以及按 URL 或本地路径读取源码片段。
+
+典型用法：
+- 先用 `list_captured_files(domain_filter="example.com")` 找入口文件
+- 再用 `read_js_file(url="https://example.com/app.js", start_line=120, end_line=180)` 看具体实现
+
+### `capture_network_requests` / `hook_function`
+
+这两个工具是运行时验证主力：
+
+- `capture_network_requests` 负责抓取 XHR / Fetch / Script 请求，突出显示 `authorization`、`x-sign`、`x-token`、`x-timestamp` 等关键请求头
+- `hook_function` 负责直接观察页面函数的参数、返回值和调用栈
+
+如果只知道“登录会触发某个签名”，但还没找到函数入口，先抓请求；如果已经定位到候选函数，先 Hook。
+
+### `analyze_encryption`
+
+对已索引代码库进行静态扫描，快速识别 MD5、SHA、AES、RSA、Base64、HMAC、CryptoJS、JSEncrypt 等常见模式。
+
+适合在第一次抓取页面后，用来快速缩小搜索范围。
+
+### `analyze_reverse_targets`
+
+按 `sign`、`token`、`encrypt`、`headers` 四类专题整理代码线索。
+
+除了代码片段，还会输出：
+- 可疑 Hook 入口
+- 关键请求头
+- 推荐搜索词
+
+这是把“静态搜索”变成“可执行逆向线索”的第一步。
+
+### `auto_probe_hook_candidates`
+
+根据专题分析结果自动挑选候选函数并逐个 Hook 试探。
+
+适合你已经知道专题方向，但还不确定到底应该 Hook 哪个函数时使用。
+
+常见场景：
+- 已知登录请求里有 `x-sign`，但不确定 `window.getSign`、`request.signRequest`、`crypto.sign` 谁是真入口
+- 已经写好了 `trigger_action`，希望工具自动试探而不是手动一个个 Hook
+
+### `correlate_request_flow`
+
+抓取真实网络请求，并自动和本地代码线索做关联。
+
+它会告诉你：
+- 哪个请求最值得优先分析
+- 请求里哪些 header / 参数和代码专题匹配
+- 哪些候选函数更值得先 Hook
+
+这是把“运行时请求”和“静态代码线索”连起来的核心工具。
+
+### `generate_verification_actions`
+
+基于请求流和代码线索，直接生成下一步建议执行的 MCP 调用。
+
+输出通常会包含：
+- `read_js_file(...)`
+- `execute_js(...)`
+- `hook_function(...)`
+- `search_local_codebase(...)`
+- `capture_network_requests(...)`
+
+适合在 AI 或人工分析卡住时，快速得到一套可执行的验证计划。
+
 ### `insight://archived-sites`
 
 Resource 类型，列出所有已归档的域名和统计信息。
+
+## 推荐逆向工作流
+
+如果你要分析登录签名、token、加密入口，推荐按这个顺序使用：
+
+1. `capture_current_page`
+   先抓取目标页面并建立本地索引。
+2. `analyze_reverse_targets`
+   先按 `sign` / `token` / `encrypt` / `headers` 看专题线索。
+3. `correlate_request_flow`
+   把真实请求和本地线索对齐，判断优先级最高的请求和 Hook 入口。
+4. `auto_probe_hook_candidates`
+   自动试探候选函数，看哪个会真正被调用。
+5. `generate_verification_actions`
+   生成下一步应执行的 `read_js_file` / `execute_js` / `hook_function` / `capture_network_requests` 动作。
+6. `hook_function` / `execute_js`
+   对命中的入口做最终验证。
+
+## 逆向示例
+
+下面是一条更贴近真实工作的调用链：
+
+```text
+capture_current_page(storage_path="/abs/path/storage/archives", target_url="https://fenbi.com/page/home", force_refresh=true)
+analyze_reverse_targets(domain_filter="fenbi.com", focus="sign")
+correlate_request_flow(domain_filter="fenbi.com", focus="sign", target_url="https://fenbi.com/page/home", trigger_action="document.querySelector('#login-btn')?.click()")
+auto_probe_hook_candidates(domain_filter="fenbi.com", focus="sign", target_url="https://fenbi.com/page/home", trigger_action="document.querySelector('#login-btn')?.click()")
+generate_verification_actions(domain_filter="fenbi.com", focus="sign", target_url="https://fenbi.com/page/home", trigger_action="document.querySelector('#login-btn')?.click()")
+```
+
+如果你面对的是密码加密而不是签名，把 `focus="sign"` 改成 `focus="encrypt"` 即可。
 
 ## 测试
 

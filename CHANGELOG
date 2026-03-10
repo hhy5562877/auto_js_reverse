@@ -1,5 +1,6 @@
 # CHANGELOG
 
+- [2026-03-10 16:04] DOCS: 更新 README 逆向工具说明与推荐工作流，补充自动分析到验证闭环的使用示例 (Files: README.md, CHANGELOG)
 - [2026-03-10 16:12] FEAT: 新增自动验证动作生成工具，基于请求流和代码线索输出可直接执行的 Hook/Execute/Search 步骤 (Files: src/browser_insight/main.py, tests/test_new_tools.py, doc/API.md, CHANGELOG)
 - [2026-03-10 16:03] FEAT: 新增请求流关联分析工具，自动将网络请求与 sign/token/encrypt/headers 代码线索对齐 (Files: src/browser_insight/services/reverse_analyzer.py, src/browser_insight/main.py, tests/test_new_tools.py, doc/API.md, CHANGELOG)
 - [2026-03-10 15:52] FEAT: 新增自动候选 Hook 试探工具，支持按专题批量验证 sign/token/encrypt/headers 入口 (Files: src/browser_insight/services/reverse_analyzer.py, src/browser_insight/main.py, tests/test_new_tools.py, doc/API.md, CHANGELOG)

@@ -40,7 +40,7 @@ tests/tmp_*/
 tests/__pycache__/
 
 # Chrome 用户数据
-.browser_insight/
+.auto_js_reverse/
 
 # Embedding 模型缓存
 .cache/

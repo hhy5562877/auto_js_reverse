@@ -42,7 +42,7 @@ class Pipeline:
         worker_script = str(
             base_dir
             / node_cfg.get(
-                "script_path", "src/browser_insight/node_worker/processor.js"
+                "script_path", "src/auto_js_reverse/node_worker/processor.js"
             )
         )
         self._node_bridge = NodeBridge(

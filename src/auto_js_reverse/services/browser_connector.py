@@ -187,7 +187,7 @@ class BrowserConnector:
             Path(self._user_data_dir).mkdir(parents=True, exist_ok=True)
             args.append(f"--user-data-dir={self._user_data_dir}")
         else:
-            default_data_dir = Path.home() / ".browser_insight" / "chrome_profile"
+            default_data_dir = Path.home() / ".auto_js_reverse" / "chrome_profile"
             default_data_dir.mkdir(parents=True, exist_ok=True)
             args.append(f"--user-data-dir={default_data_dir}")
 

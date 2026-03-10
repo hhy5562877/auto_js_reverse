@@ -58,7 +58,7 @@ def _setup_mcp():
         else {}
     )
 
-    from browser_insight.services.pipeline import Pipeline
+    from auto_js_reverse.services.pipeline import Pipeline
 
     pipeline = Pipeline(config=config, base_dir=BASE_DIR)
     return pipeline
@@ -69,7 +69,7 @@ _pipeline = _setup_mcp()
 
 
 def _swap_pipeline():
-    import browser_insight.main as main_mod
+    import auto_js_reverse.main as main_mod
 
     original = main_mod.pipeline
     main_mod.pipeline = _pipeline
@@ -77,7 +77,7 @@ def _swap_pipeline():
 
 
 def _get_fn(name: str):
-    import browser_insight.main as main_mod
+    import auto_js_reverse.main as main_mod
 
     return getattr(main_mod, name).fn
 

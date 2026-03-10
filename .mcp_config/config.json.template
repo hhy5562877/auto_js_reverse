@@ -26,6 +26,6 @@
   },
   "node_worker": {
     "max_old_space_size_mb": 256,
-    "script_path": "src/browser_insight/node_worker/processor.js"
+    "script_path": "src/auto_js_reverse/node_worker/processor.js"
   }
 }

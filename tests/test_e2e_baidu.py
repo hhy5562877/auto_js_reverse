@@ -12,14 +12,14 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from browser_insight.services.browser_connector import (
+from auto_js_reverse.services.browser_connector import (
     BrowserConnector,
     _find_chrome_binary,
 )
-from browser_insight.services.node_bridge import NodeBridge
-from browser_insight.services.index_manager import IndexManager
-from browser_insight.services.embedding_service import EmbeddingService
-from browser_insight.services.pipeline import Pipeline
+from auto_js_reverse.services.node_bridge import NodeBridge
+from auto_js_reverse.services.index_manager import IndexManager
+from auto_js_reverse.services.embedding_service import EmbeddingService
+from auto_js_reverse.services.pipeline import Pipeline
 
 logging.basicConfig(
     level=logging.INFO,
@@ -61,7 +61,7 @@ def test_chrome_detection() -> bool:
 
 def test_node_worker() -> bool:
     worker_script = (
-        BASE_DIR / "src" / "browser_insight" / "node_worker" / "processor.js"
+        BASE_DIR / "src" / "auto_js_reverse" / "node_worker" / "processor.js"
     )
     if not worker_script.exists():
         logger.error("%s processor.js 不存在", FAIL)

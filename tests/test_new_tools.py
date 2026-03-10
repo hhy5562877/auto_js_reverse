@@ -12,10 +12,10 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from browser_insight.services.browser_connector import BrowserConnector
-from browser_insight.services.index_manager import IndexManager
-from browser_insight.services.embedding_service import EmbeddingService
-from browser_insight.services.pipeline import Pipeline
+from auto_js_reverse.services.browser_connector import BrowserConnector
+from auto_js_reverse.services.index_manager import IndexManager
+from auto_js_reverse.services.embedding_service import EmbeddingService
+from auto_js_reverse.services.pipeline import Pipeline
 
 logging.basicConfig(
     level=logging.INFO,
@@ -496,7 +496,7 @@ def test_analyze_reverse_targets() -> bool:
             def __init__(self, index: IndexManager):
                 self.index = index
 
-        import browser_insight.main as main_mod
+        import auto_js_reverse.main as main_mod
 
         original_pipeline = main_mod.pipeline
         main_mod.pipeline = PipelineStub(idx)
@@ -576,7 +576,7 @@ def test_auto_probe_hook_candidates() -> bool:
                 self.index = index
                 self._browser = BrowserStub()
 
-        import browser_insight.main as main_mod
+        import auto_js_reverse.main as main_mod
 
         original_pipeline = main_mod.pipeline
         main_mod.pipeline = PipelineStub(idx)
@@ -683,7 +683,7 @@ def test_correlate_request_flow() -> bool:
                 self.index = index
                 self._browser = BrowserStub()
 
-        import browser_insight.main as main_mod
+        import auto_js_reverse.main as main_mod
 
         original_pipeline = main_mod.pipeline
         main_mod.pipeline = PipelineStub(idx)
@@ -778,7 +778,7 @@ def test_generate_verification_actions() -> bool:
                 self.index = index
                 self._browser = BrowserStub()
 
-        import browser_insight.main as main_mod
+        import auto_js_reverse.main as main_mod
 
         original_pipeline = main_mod.pipeline
         main_mod.pipeline = PipelineStub(idx)

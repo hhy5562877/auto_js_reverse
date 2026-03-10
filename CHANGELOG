@@ -1,14 +1,15 @@
 # CHANGELOG
 
+- [2026-03-10 16:23] REFACTOR: 将项目源码目录与模块命名统一从 browser_insight 切换为 auto_js_reverse，并完成本地入口校验与 Git 收口 (Files: pyproject.toml, .gitignore, .mcp_config/config.json.template, README.md, scripts/check_test_env.py, src/auto_js_reverse, tests/test_e2e_baidu.py, tests/test_fenbi_mcp_tools.py, tests/test_new_tools.py, tests/test_pipeline_resilience.py, CHANGELOG)
 - [2026-03-10 16:04] DOCS: 更新 README 逆向工具说明与推荐工作流，补充自动分析到验证闭环的使用示例 (Files: README.md, CHANGELOG)
-- [2026-03-10 16:12] FEAT: 新增自动验证动作生成工具，基于请求流和代码线索输出可直接执行的 Hook/Execute/Search 步骤 (Files: src/browser_insight/main.py, tests/test_new_tools.py, doc/API.md, CHANGELOG)
-- [2026-03-10 16:03] FEAT: 新增请求流关联分析工具，自动将网络请求与 sign/token/encrypt/headers 代码线索对齐 (Files: src/browser_insight/services/reverse_analyzer.py, src/browser_insight/main.py, tests/test_new_tools.py, doc/API.md, CHANGELOG)
-- [2026-03-10 15:52] FEAT: 新增自动候选 Hook 试探工具，支持按专题批量验证 sign/token/encrypt/headers 入口 (Files: src/browser_insight/services/reverse_analyzer.py, src/browser_insight/main.py, tests/test_new_tools.py, doc/API.md, CHANGELOG)
-- [2026-03-10 15:40] FEAT: 新增逆向专题分析工具，按 sign/token/encrypt/headers 提炼 Hook 入口与请求头线索 (Files: src/browser_insight/services/reverse_analyzer.py, src/browser_insight/main.py, tests/test_new_tools.py, doc/API.md, CHANGELOG)
+- [2026-03-10 16:12] FEAT: 新增自动验证动作生成工具，基于请求流和代码线索输出可直接执行的 Hook/Execute/Search 步骤 (Files: src/auto_js_reverse/main.py, tests/test_new_tools.py, doc/API.md, CHANGELOG)
+- [2026-03-10 16:03] FEAT: 新增请求流关联分析工具，自动将网络请求与 sign/token/encrypt/headers 代码线索对齐 (Files: src/auto_js_reverse/services/reverse_analyzer.py, src/auto_js_reverse/main.py, tests/test_new_tools.py, doc/API.md, CHANGELOG)
+- [2026-03-10 15:52] FEAT: 新增自动候选 Hook 试探工具，支持按专题批量验证 sign/token/encrypt/headers 入口 (Files: src/auto_js_reverse/services/reverse_analyzer.py, src/auto_js_reverse/main.py, tests/test_new_tools.py, doc/API.md, CHANGELOG)
+- [2026-03-10 15:40] FEAT: 新增逆向专题分析工具，按 sign/token/encrypt/headers 提炼 Hook 入口与请求头线索 (Files: src/auto_js_reverse/services/reverse_analyzer.py, src/auto_js_reverse/main.py, tests/test_new_tools.py, doc/API.md, CHANGELOG)
 - [2026-03-10 15:32] FEAT: 补充全量分层测试脚本入口，支持一条命令顺序执行 unit/integration/e2e (Files: scripts/run_tests.py, README.md, doc/TESTING.md, CHANGELOG)
 - [2026-03-10 14:52] FEAT: 新增测试环境自检与分层运行脚本，补全 integration/e2e 标准执行入口 (Files: scripts/check_test_env.py, scripts/run_tests.py, README.md, doc/TESTING.md, doc/CONTRIBUTING.md, CHANGELOG)
-- [2026-03-10 14:12] REFACTOR: 补全项目命名、测试分层与依赖兼容配置，完善 auto_js_reverse 工程化收口 (Files: pyproject.toml, uv.lock, .gitignore, README.md, doc/API.md, doc/CONTRIBUTING.md, doc/TESTING.md, src/browser_insight/main.py, src/browser_insight/__init__.py, src/browser_insight/node_worker/package.json, src/browser_insight/node_worker/package-lock.json, src/browser_insight/node_worker/processor.js, tests/test_new_tools.py, tests/test_e2e_baidu.py, tests/test_fenbi_mcp_tools.py, tests/test_pipeline_resilience.py, CHANGELOG)
-- [2026-03-10 14:03] FEAT: 按优先级修复启动阻塞、快照覆盖与索引元数据问题，并新增贡献与里程碑文档 (Files: src/browser_insight/services/pipeline.py, src/browser_insight/services/index_manager.py, src/browser_insight/main.py, tests/test_new_tools.py, tests/test_e2e_baidu.py, tests/test_pipeline_resilience.py, doc/API.md, doc/CONTRIBUTING.md, doc/MILESTONES.md, doc/ROADMAP.md, CHANGELOG)
+- [2026-03-10 14:12] REFACTOR: 补全项目命名、测试分层与依赖兼容配置，完善 auto_js_reverse 工程化收口 (Files: pyproject.toml, uv.lock, .gitignore, README.md, doc/API.md, doc/CONTRIBUTING.md, doc/TESTING.md, src/auto_js_reverse/main.py, src/auto_js_reverse/__init__.py, src/auto_js_reverse/node_worker/package.json, src/auto_js_reverse/node_worker/package-lock.json, src/auto_js_reverse/node_worker/processor.js, tests/test_new_tools.py, tests/test_e2e_baidu.py, tests/test_fenbi_mcp_tools.py, tests/test_pipeline_resilience.py, CHANGELOG)
+- [2026-03-10 14:03] FEAT: 按优先级修复启动阻塞、快照覆盖与索引元数据问题，并新增贡献与里程碑文档 (Files: src/auto_js_reverse/services/pipeline.py, src/auto_js_reverse/services/index_manager.py, src/auto_js_reverse/main.py, tests/test_new_tools.py, tests/test_e2e_baidu.py, tests/test_pipeline_resilience.py, doc/API.md, doc/CONTRIBUTING.md, doc/MILESTONES.md, doc/ROADMAP.md, CHANGELOG)
 - [2026-03-10 13:52] REFACTOR: 将 skill 调整为面向 auto_js_reverse 项目使用的逆向分析技能，并统一项目命名 (Files: skill/auto_js_reverse/SKILL.md, skill/browser-insight-cto/SKILL.md, CHANGELOG)
 - [2026-03-10 13:48] FEAT: 新增仓库审阅与演进规划协作 skill，统一代码审阅与路线设计流程 (Files: skill/browser-insight-cto/SKILL.md, CHANGELOG)
 - [2026-02-18 00:10] DOCS: 全面重写 README，完善 macOS/Linux/Windows 三平台部署教程 (Files: README.md, CHANGELOG)
@@ -30,16 +31,16 @@
   - 其他 MCP 客户端启动命令新增 Windows PowerShell 和 CMD 版本
   - 常见问题新增 Windows 端口检查命令 `netstat -ano | findstr :9222`
   - 常见问题新增 Windows 下 uv 安装和 PowerShell 执行策略两个 FAQ
-- [2026-02-16 23:54] FIX: 修复 CDP fallback 重试跳过可用标签页与 read_js_file 路径归一化异常问题 (Files: src/browser_insight/services/browser_connector.py, src/browser_insight/main.py, CHANGELOG)
+- [2026-02-16 23:54] FIX: 修复 CDP fallback 重试跳过可用标签页与 read_js_file 路径归一化异常问题 (Files: src/auto_js_reverse/services/browser_connector.py, src/auto_js_reverse/main.py, CHANGELOG)
   - connect() 新增 failed_debugger_urls 失败集合，重试时优先选择未失败过的 tab，穷尽后才允许重试历史失败 tab
   - 修复多标签场景下 A->B->A 的重复尝试问题，避免可用 tab 因重试顺序被跳过
   - read_js_file 对 Path.resolve(strict=False) 增加异常兜底，非法路径输入返回用户友好错误而非抛出未捕获异常
-- [2026-02-16 19:45] FIX: 修复目标页连接语义回归与行号边界校验问题 (Files: src/browser_insight/services/browser_connector.py, src/browser_insight/main.py, doc/API.md, CHANGELOG)
+- [2026-02-16 19:45] FIX: 修复目标页连接语义回归与行号边界校验问题 (Files: src/auto_js_reverse/services/browser_connector.py, src/auto_js_reverse/main.py, doc/API.md, CHANGELOG)
   - ensure_connected(target_url) 在连接健康时新增目标页校验，不匹配时会自动导航到目标页面
   - _check_ws_alive 改为直接发送轻量 CDP ping，不再复用 _send_command，避免健康检查路径触发静默重连到非目标页
   - read_js_file 补充 start_line/end_line 的正数校验，并在 start_line 超出总行数时返回明确错误
   - doc/API.md 同步 read_js_file 的行号参数约束（>=1 且 end_line >= start_line）
-- [2026-02-16 18:29] FIX: 按优先级修复本地文件读取安全、路径冲突与查询健壮性问题 (Files: src/browser_insight/main.py, src/browser_insight/services/pipeline.py, src/browser_insight/services/index_manager.py, pyproject.toml, doc/API.md, CHANGELOG)
+- [2026-02-16 18:29] FIX: 按优先级修复本地文件读取安全、路径冲突与查询健壮性问题 (Files: src/auto_js_reverse/main.py, src/auto_js_reverse/services/pipeline.py, src/auto_js_reverse/services/index_manager.py, pyproject.toml, doc/API.md, CHANGELOG)
   - read_js_file 增加安全边界：仅允许读取已归档且已登记索引的 JS 文件，拒绝任意本地路径与 .map 文件
   - read_js_file 增加行范围参数校验（end_line 不能小于 start_line）
   - capture_page 的 URL->本地路径映射增加 query/fragment 变体哈希，避免同路径不同 query 文件互相覆盖
@@ -48,13 +49,13 @@
   - IndexManager 新增 get_file_by_local_path 供 read_js_file 做归档文件白名单校验
   - pyproject.toml 补充 aiohttp 运行时依赖声明
   - doc/API.md 同步 read_js_file 安全限制与参数语义
-- [2026-02-16 17:48] FIX: 修复 BrowserConnector 在 websockets 新版本下连接判断异常及目标页回退误判问题 (Files: src/browser_insight/services/browser_connector.py, CHANGELOG)
+- [2026-02-16 17:48] FIX: 修复 BrowserConnector 在 websockets 新版本下连接判断异常及目标页回退误判问题 (Files: src/auto_js_reverse/services/browser_connector.py, CHANGELOG)
   - is_connected/_check_ws_alive 改为使用兼容性状态判断，不再直接访问已在新版本中移除的 `self._ws.open`
   - 新增 _is_ws_open()，兼容 `state`(websockets>=14) 与 `open/closed`(legacy) 两类连接对象
   - connect() 目标页导航判定改为基于当前实际连接 tab URL，避免 fallback 后复用旧 tabs 快照导致跳过导航
   - 抽取 _url_matches_target() 统一 URL 匹配逻辑，减少目标页匹配分支重复
   - 通过本地内联回归脚本验证 state 型 WebSocket 兼容和 fallback tab 重新导航场景
-- [2026-02-16 17:31] FIX: 增强 CDP 连接健壮性，解决连接超时和断线后无法恢复的问题 (Files: src/browser_insight/services/browser_connector.py, src/browser_insight/services/pipeline.py)
+- [2026-02-16 17:31] FIX: 增强 CDP 连接健壮性，解决连接超时和断线后无法恢复的问题 (Files: src/auto_js_reverse/services/browser_connector.py, src/auto_js_reverse/services/pipeline.py)
   - connect() 前先清理旧 WebSocket 连接，避免残留连接阻塞新连接
   - is_connected 改为检查 WebSocket 实际 open 状态，而非仅判断对象是否存在
   - 新增 _check_ws_alive() 健康检查，ensure_connected 时通过发送轻量 CDP 命令验证连接可用性
@@ -72,7 +73,7 @@
 - [2026-02-16 17:02] FIX: 修复 OpenCode MCP 配置示例与新版 schema 不兼容导致启动报错的问题 (Files: README.md, CHANGELOG)
   - OpenCode 配置从旧版 `mcpServers + type=stdio + args + env[]` 更新为 `mcp + type=local + command[] + environment{}`
   - 文档补充 OpenCode 1.2+ 的字段约束，避免出现 `Invalid input mcp.browser-insight`
-- [2026-02-16 16:00] FIX: 修复 Node.js Worker 解析压缩 JS 文件时内存爆炸导致 chunks_indexed=0 的问题 (Files: src/browser_insight/node_worker/processor.js)
+- [2026-02-16 16:00] FIX: 修复 Node.js Worker 解析压缩 JS 文件时内存爆炸导致 chunks_indexed=0 的问题 (Files: src/auto_js_reverse/node_worker/processor.js)
   - 根因: 压缩文件(如 main-es5.js 3MB单行)的 AST 节点用行号切片时，每个节点都提取整行(=整个文件)，导致 6552 chunks × 3MB = 18.6GB
   - 修复: 检测压缩文件(平均行长 > 4000 字符)后，使用字符偏移(node.start/node.end)替代行号切片
   - 新增 chunkByChars() 按 4000 字符切分，MAX_CHUNK_CHARS=8000 防止单个 chunk 过大
@@ -82,13 +83,13 @@
   - 直接调用 MCP 工具函数(通过 FastMCP FunctionTool.fn)模拟 AI 使用工具进行逆向
   - 9 个步骤: capture → list → analyze → search → read → execute → hook → network → verify
   - 逆向结论: window.encrypt(publicKey, plaintext) → RSA(65537) → Base64, 登录 API: POST api/users/loginV2
-- [2026-02-16 15:20] FIX: 修复多个工具在真实逆向场景中的可用性问题 (Files: src/browser_insight/services/browser_connector.py, src/browser_insight/services/embedding_service.py, src/browser_insight/main.py)
+- [2026-02-16 15:20] FIX: 修复多个工具在真实逆向场景中的可用性问题 (Files: src/auto_js_reverse/services/browser_connector.py, src/auto_js_reverse/services/embedding_service.py, src/auto_js_reverse/main.py)
   - 重构 CDP WebSocket 消息路由：command 响应和 event 分离，解决 network capture 和 evaluate 互相干扰
   - capture_network_requests/hook_function 新增 trigger_action 参数，AI 可在监听期间自动触发操作
   - search_local_codebase 去重，避免返回重复代码片段
   - embedding_service 增加 429 限流自动重试（指数退避）
   - embedding_service 修复空文本导致 API 400 错误
-- [2026-02-16 15:05] FEAT: 新增 6 个逆向分析 MCP 工具，完善 AI 自动逆向能力 (Files: src/browser_insight/main.py, src/browser_insight/services/browser_connector.py, src/browser_insight/services/index_manager.py, doc/API.md)
+- [2026-02-16 15:05] FEAT: 新增 6 个逆向分析 MCP 工具，完善 AI 自动逆向能力 (Files: src/auto_js_reverse/main.py, src/auto_js_reverse/services/browser_connector.py, src/auto_js_reverse/services/index_manager.py, doc/API.md)
   - list_captured_files: 列出已抓取的 JS 文件列表
   - read_js_file: 读取 JS 文件源码（支持行范围）
   - execute_js: 在页面上下文执行 JS 表达式
@@ -97,19 +98,19 @@
   - analyze_encryption: 自动扫描加密模式（MD5/AES/RSA/Base64/HMAC 等）
   - BrowserConnector 扩展: evaluate()、enable_network()、collect_network_events()
   - IndexManager 扩展: list_files_by_domain()、get_file_by_url()、search_chunks_by_text()
-- [2026-02-16 12:45] REFACTOR: 所有运行时数据统一存储到 storage/ 目录下（数据库 storage/db、模型 storage/models、归档 storage/archives、Chrome 配置 storage/chrome_profile） (Files: .mcp_config/config.json, src/browser_insight/services/pipeline.py, src/browser_insight/services/embedding_service.py, src/browser_insight/services/browser_connector.py, .gitignore, README.md)
+- [2026-02-16 12:45] REFACTOR: 所有运行时数据统一存储到 storage/ 目录下（数据库 storage/db、模型 storage/models、归档 storage/archives、Chrome 配置 storage/chrome_profile） (Files: .mcp_config/config.json, src/auto_js_reverse/services/pipeline.py, src/auto_js_reverse/services/embedding_service.py, src/auto_js_reverse/services/browser_connector.py, .gitignore, README.md)
 - [2026-02-16 12:39] FEAT: 端到端集成测试 (www.baidu.com)，覆盖 Chrome 检测、Node.js Worker、Embedding、IndexManager、完整管线五个环节 (Files: tests/test_e2e_baidu.py)
-- [2026-02-16 12:39] FIX: NodeBridge stdout 流限制从 64KB 提升到 50MB，修复大量代码块解析时 LimitOverrunError (Files: src/browser_insight/services/node_bridge.py)
+- [2026-02-16 12:39] FIX: NodeBridge stdout 流限制从 64KB 提升到 50MB，修复大量代码块解析时 LimitOverrunError (Files: src/auto_js_reverse/services/node_bridge.py)
 - [2026-02-16 12:39] CHORE: 补全 .gitignore，添加 Python 依赖 pandas/python-socks (Files: .gitignore, pyproject.toml)
 - [2026-02-16 12:20] DOCS: README 重写 IDE 配置章节，统一使用 uv run 启动，覆盖 Cursor/Windsurf/Claude Code/VS Code 四种 IDE 的 JSON 配置方式 (Files: README.md)
-- [2026-02-16 12:10] FEAT: capture_current_page 新增 storage_path 必填参数，由 AI 指定文件存储路径；存储结构改为 {storage_path}/{日期}/{域名}/{原始URL路径}，保留网站原始目录结构 (Files: src/browser_insight/main.py, src/browser_insight/services/pipeline.py, doc/API.md, README.md)
-- [2026-02-16 12:00] FEAT: Chrome 自动启动功能，未检测到远程调试端口时自动查找并启动本机浏览器 (Files: src/browser_insight/services/browser_connector.py, src/browser_insight/services/pipeline.py, .mcp_config/config.json, README.md)
+- [2026-02-16 12:10] FEAT: capture_current_page 新增 storage_path 必填参数，由 AI 指定文件存储路径；存储结构改为 {storage_path}/{日期}/{域名}/{原始URL路径}，保留网站原始目录结构 (Files: src/auto_js_reverse/main.py, src/auto_js_reverse/services/pipeline.py, doc/API.md, README.md)
+- [2026-02-16 12:00] FEAT: Chrome 自动启动功能，未检测到远程调试端口时自动查找并启动本机浏览器 (Files: src/auto_js_reverse/services/browser_connector.py, src/auto_js_reverse/services/pipeline.py, .mcp_config/config.json, README.md)
   - 支持自动检测 Chrome/Chromium/Brave/Edge
   - 支持 headless 无头模式
   - 独立用户数据目录，不影响日常 Chrome 配置
   - 可通过 auto_launch 配置项关闭
 - [2026-02-16 11:50] DOCS: 添加 README 使用文档，包含 Claude Code/Cursor/通用 MCP 客户端接入方式和 hf-mirror 镜像配置 (Files: README.md)
-- [2026-02-16 11:38] FEAT: 初始化 Browser Insight Hybrid MCP 项目，实现完整的混合架构 (Files: pyproject.toml, .mcp_config/config.json, src/browser_insight/node_worker/package.json, src/browser_insight/node_worker/processor.js, src/browser_insight/services/browser_connector.py, src/browser_insight/services/node_bridge.py, src/browser_insight/services/index_manager.py, src/browser_insight/services/embedding_service.py, src/browser_insight/services/pipeline.py, src/browser_insight/main.py)
+- [2026-02-16 11:38] FEAT: 初始化 Browser Insight Hybrid MCP 项目，实现完整的混合架构 (Files: pyproject.toml, .mcp_config/config.json, src/auto_js_reverse/node_worker/package.json, src/auto_js_reverse/node_worker/processor.js, src/auto_js_reverse/services/browser_connector.py, src/auto_js_reverse/services/node_bridge.py, src/auto_js_reverse/services/index_manager.py, src/auto_js_reverse/services/embedding_service.py, src/auto_js_reverse/services/pipeline.py, src/auto_js_reverse/main.py)
   - Node.js Worker: source-map 高保真还原 + acorn AST 语义切分
   - Python BrowserConnector: CDP WebSocket 连接、资源发现、脚本下载
   - Python NodeBridge: Node.js 子进程常驻管理、stdin/stdout JSON 行协议通信

@@ -13,12 +13,12 @@ from typing import Iterable
 ROOT_DIR = Path(__file__).resolve().parent.parent
 SRC_DIR = ROOT_DIR / "src"
 CONFIG_PATH = ROOT_DIR / ".mcp_config" / "config.json"
-NODE_WORKER_DIR = SRC_DIR / "browser_insight" / "node_worker"
+NODE_WORKER_DIR = SRC_DIR / "auto_js_reverse" / "node_worker"
 
 if str(SRC_DIR) not in sys.path:
     sys.path.insert(0, str(SRC_DIR))
 
-from browser_insight.services.browser_connector import _find_chrome_binary
+from auto_js_reverse.services.browser_connector import _find_chrome_binary
 
 
 @dataclass

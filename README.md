@@ -160,7 +160,7 @@ uv pip install fastmcp websockets lancedb pyarrow aiohttp numpy
 **macOS / Linux:**
 
 ```bash
-cd src/browser_insight/node_worker
+cd src/auto_js_reverse/node_worker
 npm install
 cd ../../..
 ```
@@ -168,7 +168,7 @@ cd ../../..
 **Windows:**
 
 ```cmd
-cd src\browser_insight\node_worker
+cd src\auto_js_reverse\node_worker
 npm install
 cd ..\..\..
 ```
@@ -330,7 +330,7 @@ http://localhost:9222/json
         "run",
         "--directory", "这里填写项目路径",
         "--python", "3.12",
-        "python", "-m", "browser_insight.main"
+        "python", "-m", "auto_js_reverse.main"
       ],
       "env": {
         "PYTHONPATH": "这里填写项目路径/src",
@@ -352,7 +352,7 @@ http://localhost:9222/json
         "run",
         "--directory", "这里填写项目路径",
         "--python", "3.12",
-        "python", "-m", "browser_insight.main"
+        "python", "-m", "auto_js_reverse.main"
       ],
       "env": {
         "PYTHONPATH": "这里填写项目路径/src",
@@ -380,7 +380,7 @@ http://localhost:9222/json
         "run",
         "--directory", "这里填写项目路径",
         "--python", "3.12",
-        "python", "-m", "browser_insight.main"
+        "python", "-m", "auto_js_reverse.main"
       ],
       "env": {
         "PYTHONPATH": "这里填写项目路径/src",
@@ -402,7 +402,7 @@ http://localhost:9222/json
         "run",
         "--directory", "这里填写项目路径",
         "--python", "3.12",
-        "python", "-m", "browser_insight.main"
+        "python", "-m", "auto_js_reverse.main"
       ],
       "env": {
         "PYTHONPATH": "这里填写项目路径/src",
@@ -430,7 +430,7 @@ http://localhost:9222/json
         "run",
         "--directory", "这里填写项目路径",
         "--python", "3.12",
-        "python", "-m", "browser_insight.main"
+        "python", "-m", "auto_js_reverse.main"
       ],
       "env": {
         "PYTHONPATH": "这里填写项目路径/src",
@@ -452,7 +452,7 @@ http://localhost:9222/json
         "run",
         "--directory", "这里填写项目路径",
         "--python", "3.12",
-        "python", "-m", "browser_insight.main"
+        "python", "-m", "auto_js_reverse.main"
       ],
       "env": {
         "PYTHONPATH": "这里填写项目路径/src",
@@ -471,7 +471,7 @@ http://localhost:9222/json
 claude mcp add auto-js-reverse \
   -e PYTHONPATH=这里填写项目路径/src \
   -e SILICONFLOW_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx \
-  -- uv run --directory 这里填写项目路径 --python 3.12 python -m browser_insight.main
+  -- uv run --directory 这里填写项目路径 --python 3.12 python -m auto_js_reverse.main
 ```
 
 **Windows (PowerShell):**
@@ -480,7 +480,7 @@ claude mcp add auto-js-reverse \
 claude mcp add auto-js-reverse `
   -e PYTHONPATH=这里填写项目路径/src `
   -e SILICONFLOW_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx `
-  -- uv run --directory 这里填写项目路径 --python 3.12 python -m browser_insight.main
+  -- uv run --directory 这里填写项目路径 --python 3.12 python -m auto_js_reverse.main
 ```
 
 #### 验证连接
@@ -515,7 +515,7 @@ claude mcp add auto-js-reverse `
         "run",
         "--directory", "这里填写项目路径",
         "--python", "3.12",
-        "python", "-m", "browser_insight.main"
+        "python", "-m", "auto_js_reverse.main"
       ],
       "env": {
         "PYTHONPATH": "这里填写项目路径/src",
@@ -537,7 +537,7 @@ claude mcp add auto-js-reverse `
         "run",
         "--directory", "这里填写项目路径",
         "--python", "3.12",
-        "python", "-m", "browser_insight.main"
+        "python", "-m", "auto_js_reverse.main"
       ],
       "env": {
         "PYTHONPATH": "这里填写项目路径/src",
@@ -562,7 +562,7 @@ claude mcp add auto-js-reverse `
       "command": [
         "这里填写项目路径/.venv/bin/python",
         "-m",
-        "browser_insight.main"
+        "auto_js_reverse.main"
       ],
       "environment": {
         "PYTHONPATH": "这里填写项目路径/src",
@@ -584,7 +584,7 @@ claude mcp add auto-js-reverse `
       "command": [
         "这里填写项目路径/.venv/Scripts/python.exe",
         "-m",
-        "browser_insight.main"
+        "auto_js_reverse.main"
       ],
       "environment": {
         "PYTHONPATH": "这里填写项目路径/src",
@@ -609,7 +609,7 @@ claude mcp add auto-js-reverse `
 ```bash
 SILICONFLOW_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx \
 PYTHONPATH=这里填写项目路径/src \
-uv run --directory 这里填写项目路径 --python 3.12 python -m browser_insight.main
+uv run --directory 这里填写项目路径 --python 3.12 python -m auto_js_reverse.main
 ```
 
 **Windows (PowerShell):**
@@ -617,7 +617,7 @@ uv run --directory 这里填写项目路径 --python 3.12 python -m browser_insi
 ```powershell
 $env:SILICONFLOW_API_KEY = "sk-xxxxxxxxxxxxxxxxxxxxxxxx"
 $env:PYTHONPATH = "这里填写项目路径\src"
-uv run --directory "这里填写项目路径" --python 3.12 python -m browser_insight.main
+uv run --directory "这里填写项目路径" --python 3.12 python -m auto_js_reverse.main
 ```
 
 **Windows (CMD):**
@@ -625,7 +625,7 @@ uv run --directory "这里填写项目路径" --python 3.12 python -m browser_in
 ```cmd
 set SILICONFLOW_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
 set PYTHONPATH=这里填写项目路径\src
-uv run --directory "这里填写项目路径" --python 3.12 python -m browser_insight.main
+uv run --directory "这里填写项目路径" --python 3.12 python -m auto_js_reverse.main
 ```
 
 ## MCP 工具说明
@@ -917,7 +917,7 @@ node --version
 
 # 清除 npm 缓存后重试
 npm cache clean --force
-cd src/browser_insight/node_worker
+cd src/auto_js_reverse/node_worker
 rm -rf node_modules package-lock.json
 npm install
 ```
@@ -926,7 +926,7 @@ npm install
 ```powershell
 node --version
 npm cache clean --force
-cd src\browser_insight\node_worker
+cd src\auto_js_reverse\node_worker
 Remove-Item -Recurse -Force node_modules, package-lock.json
 npm install
 ```
@@ -961,16 +961,16 @@ curl -s https://api.siliconflow.cn/v1/models | head -c 200
 
 **Q: Node.js 依赖未安装**
 
-进入 `src/browser_insight/node_worker/` 目录执行 `npm install`：
+进入 `src/auto_js_reverse/node_worker/` 目录执行 `npm install`：
 
 **macOS / Linux:**
 ```bash
-cd src/browser_insight/node_worker && npm install
+cd src/auto_js_reverse/node_worker && npm install
 ```
 
 **Windows:**
 ```cmd
-cd src\browser_insight\node_worker && npm install
+cd src\auto_js_reverse\node_worker && npm install
 ```
 
 **Q: Source Map 未还原**
@@ -1023,7 +1023,7 @@ RUN apt-get update && apt-get install -y \
 
 WORKDIR /app
 COPY . .
-RUN cd src/browser_insight/node_worker && npm install
+RUN cd src/auto_js_reverse/node_worker && npm install
 
 ENV PATH="/root/.cargo/bin:$PATH"
 ENV PYTHONPATH=/app/src

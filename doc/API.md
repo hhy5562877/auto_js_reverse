@@ -230,6 +230,30 @@
 
 ---
 
+### `generate_verification_actions`
+
+| 属性 | 说明 |
+|------|------|
+| 功能 | 基于请求流和代码线索生成下一步验证动作 |
+| 类型 | Tool |
+
+**参数:**
+
+| 参数名 | 类型 | 必填 | 说明 |
+|--------|------|------|------|
+| `domain_filter` | `str` | 否 | 限制代码线索扫描的域名 |
+| `focus` | `str` | 否 | 指定专题：`sign`、`token`、`encrypt`、`headers` |
+| `target_url` | `str` | 否 | 目标页面 URL |
+| `trigger_action` | `str` | 否 | 抓包开始后自动执行的 JS，用于触发请求 |
+| `duration` | `float` | 否 (默认 `10.0`) | 抓包时长（秒） |
+| `filter_type` | `str` | 否 (默认 `XHR`) | 过滤请求类型 |
+| `max_requests` | `int` | 否 (默认 `3`) | 最多参考多少个高优先级请求 |
+| `max_candidates` | `int` | 否 (默认 `3`) | 最多参考多少个 Hook 候选函数 |
+
+**返回:** 按顺序输出可直接复制执行的 MCP Tool 调用建议，包含 `read_js_file`、`execute_js`、`hook_function`、`search_local_codebase`、`capture_network_requests` 等下一步验证动作。
+
+---
+
 ## MCP Resources
 
 ### `insight://archived-sites`
@@ -252,9 +276,10 @@
 3. **`analyze_reverse_targets`** — 按专题提炼 sign/token/encrypt/headers 的候选入口
 4. **`auto_probe_hook_candidates`** — 自动试探候选 Hook 入口，快速验证哪一个真正被调用
 5. **`correlate_request_flow`** — 把真实网络请求和代码线索自动对齐，锁定更值得验证的请求
-6. **`analyze_encryption`** — 自动扫描加密模式，快速定位关键代码
-7. **`search_local_codebase`** — 语义搜索特定功能（如 "登录请求签名"）
-8. **`read_js_file`** — 读取完整的加密函数源码
-9. **`capture_network_requests`** — 监听 API 请求，观察加密参数
-10. **`hook_function`** — Hook 加密函数，观察实际输入输出
-11. **`execute_js`** — 在页面中执行代码验证逆向结果
+6. **`generate_verification_actions`** — 自动生成下一步应执行的验证动作
+7. **`analyze_encryption`** — 自动扫描加密模式，快速定位关键代码
+8. **`search_local_codebase`** — 语义搜索特定功能（如 "登录请求签名"）
+9. **`read_js_file`** — 读取完整的加密函数源码
+10. **`capture_network_requests`** — 监听 API 请求，观察加密参数
+11. **`hook_function`** — Hook 加密函数，观察实际输入输出
+12. **`execute_js`** — 在页面中执行代码验证逆向结果

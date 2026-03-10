@@ -713,6 +713,102 @@ def test_correlate_request_flow() -> bool:
         shutil.rmtree(tmp_db, ignore_errors=True)
 
 
+@pytest.mark.unit
+def test_generate_verification_actions() -> bool:
+    """测试自动生成验证动作"""
+    tmp_db = tempfile.mkdtemp(prefix="mcp_test_verification_actions_")
+    try:
+        idx = IndexManager(tmp_db)
+        fake_vector = [0.1] * 1024
+        idx.add_code_chunks([
+            {
+                "vector": fake_vector,
+                "text": "window.getSign = function(body, ts, nonce) { return md5(body + ts + nonce + secret); };",
+                "original_file": "sign.js",
+                "url": "https://test.com/sign.js",
+                "domain": "test.com",
+                "line_start": 30,
+                "line_end": 30,
+                "source_map_restored": True,
+                "file_hash": "e1",
+            },
+            {
+                "vector": fake_vector,
+                "text": "function attachHeaders(cfg) { cfg.headers['x-sign'] = window.getSign(cfg.data, cfg.headers['x-timestamp'], cfg.headers['x-nonce']); return cfg; }",
+                "original_file": "request.js",
+                "url": "https://test.com/request.js",
+                "domain": "test.com",
+                "line_start": 50,
+                "line_end": 55,
+                "source_map_restored": True,
+                "file_hash": "e2",
+            },
+        ])
+
+        class BrowserStub:
+            async def ensure_connected(self, target_url: str = None) -> None:
+                return None
+
+            async def evaluate(self, expression: str):
+                if expression == "window.login()":
+                    return None
+                if expression == "location.reload()":
+                    return None
+                raise AssertionError(f"收到未预期的表达式: {expression}")
+
+            async def collect_network_events(self, duration_sec: float) -> list[dict]:
+                return [
+                    {
+                        "url": "https://api.test.com/login",
+                        "method": "POST",
+                        "headers": {
+                            "x-sign": "abc123",
+                            "x-timestamp": "1700000000",
+                            "x-nonce": "nonce-1",
+                        },
+                        "postData": '{"password":"secret"}',
+                        "type": "XHR",
+                        "initiator": "script",
+                        "response": {"status": 200},
+                    }
+                ]
+
+        class PipelineStub:
+            def __init__(self, index: IndexManager):
+                self.index = index
+                self._browser = BrowserStub()
+
+        import browser_insight.main as main_mod
+
+        original_pipeline = main_mod.pipeline
+        main_mod.pipeline = PipelineStub(idx)
+        try:
+            result = asyncio.run(
+                main_mod.generate_verification_actions.fn(
+                    domain_filter="test.com",
+                    focus="sign",
+                    target_url="https://test.com/login",
+                    trigger_action="window.login()",
+                    duration=0.1,
+                    max_requests=2,
+                    max_candidates=2,
+                )
+            )
+        finally:
+            main_mod.pipeline = original_pipeline
+
+        assert "自动验证动作建议" in result
+        assert "read_js_file(url=\"https://test.com/sign.js\"" in result
+        assert "execute_js(expression=\"typeof window.getSign\"" in result
+        assert "hook_function(function_path=\"window.getSign\"" in result
+        assert "capture_network_requests(" in result
+
+        logger.info("%s generate_verification_actions (自动生成验证动作)", PASS)
+        return True
+    finally:
+        shutil.rmtree(tmp_db, ignore_errors=True)
+
+
 def main():
     logger.info("=" * 60)
     logger.info("auto_js_reverse 新工具测试")
@@ -738,17 +834,20 @@ def main():
     logger.info("\n--- 6/7 hook_function ---")
     results["hook_function"] = test_hook_function()
 
-    logger.info("\n--- 7/10 analyze_encryption ---")
+    logger.info("\n--- 7/11 analyze_encryption ---")
     results["analyze_encryption"] = test_analyze_encryption()
 
-    logger.info("\n--- 8/10 analyze_reverse_targets ---")
+    logger.info("\n--- 8/11 analyze_reverse_targets ---")
     results["analyze_reverse_targets"] = test_analyze_reverse_targets()
 
-    logger.info("\n--- 9/10 auto_probe_hook_candidates ---")
+    logger.info("\n--- 9/11 auto_probe_hook_candidates ---")
     results["auto_probe_hook_candidates"] = test_auto_probe_hook_candidates()
 
-    logger.info("\n--- 10/10 correlate_request_flow ---")
+    logger.info("\n--- 10/11 correlate_request_flow ---")
     results["correlate_request_flow"] = test_correlate_request_flow()
+
+    logger.info("\n--- 11/11 generate_verification_actions ---")
+    results["generate_verification_actions"] = test_generate_verification_actions()
 
     logger.info("\n" + "=" * 60)
     logger.info("测试结果汇总:")

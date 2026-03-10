@@ -164,6 +164,25 @@ def _format_hook_output(function_path: str, calls: list[dict], duration: float) 
     return "\n".join(lines)
 
 
+def _format_tool_arg(value: object) -> str:
+    if isinstance(value, str):
+        return json.dumps(value, ensure_ascii=False)
+    if value is None:
+        return "None"
+    if isinstance(value, bool):
+        return "True" if value else "False"
+    return str(value)
+
+
+def _format_tool_call(tool_name: str, **kwargs: object) -> str:
+    rendered = ", ".join(
+        f"{key}={_format_tool_arg(value)}"
+        for key, value in kwargs.items()
+        if value is not None
+    )
+    return f"{tool_name}({rendered})"
+
+
 def _extract_interesting_headers(headers: dict[str, object]) -> dict[str, object]:
     return {
         key: value
@@ -274,6 +293,151 @@ def _score_network_event(
         "matched_focuses": matched_focuses,
         "score": score,
     }
+
+
+def _build_verification_plan(
+    ranked_requests: list[dict],
+    candidates: list[dict],
+    template_context: dict[str, dict[str, object]],
+    target_url: Optional[str],
+    trigger_action: Optional[str],
+) -> str:
+    lines = ["🧪 自动验证动作建议\n"]
+
+    if ranked_requests:
+        top_request = ranked_requests[0]
+        event = top_request["event"]
+        lines.append(
+            f"- 首要请求: `{event.get('method', '?')} {event.get('url', '')}`"
+        )
+        if top_request["interesting_headers"]:
+            lines.append(
+                "- 关联请求头: "
+                + ", ".join(
+                    f"`{name}`" for name in top_request["interesting_headers"].keys()
+                )
+            )
+        if top_request["keywords"]:
+            lines.append(
+                "- 关联关键字: "
+                + ", ".join(f"`{item}`" for item in top_request["keywords"])
+            )
+    else:
+        lines.append("- 当前未捕获到实时请求，以下动作仅基于代码线索生成。")
+
+    lines.append("")
+    lines.append("建议执行顺序:")
+
+    step_index = 1
+    used_targets: set[str] = set()
+    used_urls: set[str] = set()
+    used_queries: set[str] = set()
+
+    selected_candidates: list[dict] = []
+    for item in ranked_requests:
+        for candidate in item.get("matched_candidates", []):
+            target = str(candidate["target"])
+            if target in used_targets:
+                continue
+            source = next(
+                (entry for entry in candidates if entry.get("target") == target),
+                None,
+            )
+            if source:
+                selected_candidates.append(source)
+                used_targets.add(target)
+
+    for candidate in candidates:
+        target = str(candidate["target"])
+        if target not in used_targets and len(selected_candidates) < 3:
+            selected_candidates.append(candidate)
+            used_targets.add(target)
+
+    for candidate in selected_candidates[:3]:
+        url = str(candidate.get("url", ""))
+        line_start = int(candidate.get("line_start", 1) or 1)
+        start_line = max(1, line_start - 5)
+        end_line = line_start + 20
+        if url and url not in used_urls:
+            lines.append(
+                f"{step_index}. 先读源码定位上下文：`"
+                + _format_tool_call(
+                    "read_js_file",
+                    url=url,
+                    start_line=start_line,
+                    end_line=end_line,
+                )
+                + "`"
+            )
+            used_urls.add(url)
+            step_index += 1
+
+        target = str(candidate["target"])
+        lines.append(
+            f"{step_index}. 验证函数是否存在：`"
+            + _format_tool_call(
+                "execute_js",
+                expression=f"typeof {target}",
+                target_url=target_url,
+            )
+            + "`"
+        )
+        step_index += 1
+
+        lines.append(
+            f"{step_index}. 直接 Hook 观察调用：`"
+            + _format_tool_call(
+                "hook_function",
+                function_path=target,
+                target_url=target_url,
+                trigger_action=trigger_action,
+                max_calls=5,
+                duration=8.0,
+            )
+            + "`"
+        )
+        step_index += 1
+
+    focus_names: list[str] = []
+    for item in ranked_requests:
+        for matched in item.get("matched_focuses", []):
+            focus_name = str(matched["focus"])
+            if focus_name not in focus_names:
+                focus_names.append(focus_name)
+
+    for focus_name in focus_names[:2]:
+        context = template_context.get(focus_name, {})
+        for query in context.get("recommended_queries", []):
+            query_text = str(query)
+            if query_text in used_queries:
+                continue
+            lines.append(
+                f"{step_index}. 补充语义搜索：`"
+                + _format_tool_call(
+                    "search_local_codebase",
+                    query=query_text,
+                    domain_filter=None,
+                    limit=5,
+                )
+                + "`"
+            )
+            used_queries.add(query_text)
+            step_index += 1
+            break
+
+    lines.append(
+        f"{step_index}. 回放请求确认头和参数：`"
+        + _format_tool_call(
+            "capture_network_requests",
+            target_url=target_url,
+            duration=10.0,
+            trigger_action=trigger_action,
+            filter_type="XHR",
+        )
+        + "`"
+    )
+
+    return "\n".join(lines)
 
 
 @mcp.tool
@@ -898,6 +1062,83 @@ async def correlate_request_flow(
         )
 
     return "\n".join(lines)
+
+
+@mcp.tool
+async def generate_verification_actions(
+    domain_filter: Optional[str] = None,
+    focus: Optional[str] = None,
+    target_url: Optional[str] = None,
+    trigger_action: Optional[str] = None,
+    duration: float = 10.0,
+    filter_type: Optional[str] = "XHR",
+    max_requests: int = 3,
+    max_candidates: int = 3,
+) -> str:
+    """基于请求流和代码线索生成下一步验证动作。
+    输出可直接复制执行的 MCP Tool 调用建议，帮助把分析结果尽快转成验证闭环。
+
+    Args:
+        domain_filter: 限制代码线索扫描的域名
+        focus: 指定专题，可选 sign、token、encrypt、headers
+        target_url: 目标页面 URL（可选）
+        trigger_action: 抓包开始后自动执行的 JS，用于触发请求
+        duration: 抓包时长（秒）
+        filter_type: 过滤请求类型，默认 `XHR`
+        max_requests: 最多参考多少个高优先级请求
+        max_candidates: 最多参考多少个 Hook 候选函数
+    """
+    try:
+        analyzer = ReverseAnalyzer(pipeline.index)
+        candidates = analyzer.collect_hook_candidates(
+            domain_filter=domain_filter,
+            focus=focus,
+            limit=max_candidates,
+        )
+        template_context = analyzer.collect_template_context(focus=focus)
+    except ValueError as e:
+        return f"❌ 参数错误: {e}"
+    except Exception as e:
+        logger.exception("generate_verification_actions 分析候选失败")
+        return f"❌ 验证动作生成失败: {e}"
+
+    ranked_requests: list[dict] = []
+    try:
+        events = await _capture_network_events(
+            target_url=target_url,
+            duration=duration,
+            trigger_action=trigger_action,
+            filter_type=filter_type,
+        )
+    except Exception as e:
+        logger.warning("generate_verification_actions 抓包失败: %s", e)
+        events = []
+
+    if events:
+        ranked_requests = [
+            _score_network_event(
+                event=event,
+                candidates=candidates,
+                template_context=template_context,
+            )
+            for event in events
+        ]
+        ranked_requests.sort(key=lambda item: item["score"], reverse=True)
+        ranked_requests = ranked_requests[:max_requests]
+
+    if not ranked_requests and not candidates:
+        return (
+            "未生成任何验证动作。建议先执行 capture_current_page 抓取页面，"
+            "再用 analyze_reverse_targets 或 correlate_request_flow 建立线索。"
+        )
+
+    return _build_verification_plan(
+        ranked_requests=ranked_requests,
+        candidates=candidates,
+        template_context=template_context,
+        target_url=target_url,
+        trigger_action=trigger_action,
+    )
 
 
 @mcp.resource("insight://archived-sites")

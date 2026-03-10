@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import warnings
 from pathlib import Path
 from typing import Optional
@@ -104,20 +105,42 @@ class IndexManager:
             search = search.where(self._eq_filter("domain", domain_filter))
         return search.to_list()
 
+    def _list_file_records(self, domain: Optional[str] = None) -> list[dict]:
+        total = self.get_file_count()
+        if total == 0:
+            return []
+
+        query = self._file_index.search()
+        if domain:
+            query = query.where(self._eq_filter("domain", domain))
+        return query.limit(total).to_list()
+
+    def _list_chunk_records(self, domain: Optional[str] = None) -> list[dict]:
+        total = self.get_chunk_count()
+        if total == 0:
+            return []
+
+        query = self._code_chunks.search()
+        if domain:
+            query = query.where(self._eq_filter("domain", domain))
+        return query.limit(total).to_list()
+
     def list_domains(self) -> list[dict]:
         try:
-            df = self._file_index.to_pandas()
-            if df.empty:
-                return []
-            grouped = (
-                df.groupby("domain")
-                .agg(
-                    file_count=("url", "count"),
-                    latest=("timestamp", "max"),
+            grouped: dict[str, dict[str, str | int]] = {}
+            for record in self._list_file_records():
+                domain = record.get("domain", "")
+                if not domain:
+                    continue
+                current = grouped.setdefault(
+                    domain,
+                    {"domain": domain, "file_count": 0, "latest": ""},
                 )
-                .reset_index()
-            )
-            return grouped.to_dict("records")
+                current["file_count"] = int(current["file_count"]) + 1
+                timestamp = record.get("timestamp", "")
+                if isinstance(timestamp, str) and timestamp > str(current["latest"]):
+                    current["latest"] = timestamp
+            return list(grouped.values())
         except Exception:
             return []
 
@@ -143,12 +166,7 @@ class IndexManager:
 
     def list_files_by_domain(self, domain: Optional[str] = None) -> list[dict]:
         try:
-            df = self._file_index.to_pandas()
-            if df.empty:
-                return []
-            if domain:
-                df = df[df["domain"] == domain]
-            return df.to_dict("records")
+            return self._list_file_records(domain=domain)
         except Exception:
             return []
 
@@ -192,18 +210,17 @@ class IndexManager:
         self, pattern: str, domain: Optional[str] = None, limit: int = 50
     ) -> list[dict]:
         try:
-            df = self._code_chunks.to_pandas()
-            if df.empty:
+            records = self._list_chunk_records(domain=domain)
+            if not records:
                 return []
-            if domain:
-                df = df[df["domain"] == domain]
+            regex = re.compile(pattern, flags=re.IGNORECASE)
             with warnings.catch_warnings():
                 warnings.simplefilter("ignore", UserWarning)
-                mask = df["text"].str.contains(
-                    pattern, case=False, na=False, regex=True
-                )
-            matched = df[mask].head(limit)
-            cols = [c for c in matched.columns if c != "vector"]
-            return matched[cols].to_dict("records")
+                matched = [
+                    {k: v for k, v in record.items() if k != "vector"}
+                    for record in records
+                    if regex.search(str(record.get("text", "")))
+                ]
+            return matched[:limit]
         except Exception:
             return []

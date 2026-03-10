@@ -51,12 +51,14 @@ class Pipeline:
         )
 
         emb_cfg = config.get("embedding", {})
-        self._embedding = EmbeddingService(
-            model_name=emb_cfg.get("model_name", "BAAI/bge-m3"),
-            batch_size=emb_cfg.get("batch_size", 32),
-            api_key=emb_cfg.get("api_key"),
-            api_url=emb_cfg.get("api_url"),
-        )
+        self._embedding_config = {
+            "model_name": emb_cfg.get("model_name", "BAAI/bge-m3"),
+            "batch_size": emb_cfg.get("batch_size", 32),
+            "api_key": emb_cfg.get("api_key"),
+            "api_url": emb_cfg.get("api_url"),
+        }
+        self._embedding: Optional[EmbeddingService] = None
+        self._embedding_error: Optional[str] = None
 
         self._index = IndexManager(self._db_dir)
 
@@ -70,7 +72,40 @@ class Pipeline:
 
     @property
     def embedding(self) -> EmbeddingService:
+        if self._embedding is None:
+            try:
+                self._embedding = EmbeddingService(**self._embedding_config)
+                self._embedding_error = None
+            except Exception as e:
+                self._embedding_error = str(e)
+                raise RuntimeError(self._embedding_error) from e
         return self._embedding
+
+    def get_embedding_unavailable_reason(self) -> Optional[str]:
+        try:
+            self.embedding
+        except RuntimeError as e:
+            return str(e)
+        return None
+
+    def _build_session_dir(
+        self,
+        base_storage: Path,
+        domain: str,
+        captured_at: Optional[datetime] = None,
+    ) -> Path:
+        captured_at = captured_at or datetime.now(timezone.utc)
+        day_dir = captured_at.strftime("%Y-%m-%d")
+        session_name = captured_at.strftime("%H%M%S-%f")
+        session_dir = base_storage / day_dir / domain / session_name
+        suffix = 1
+
+        while session_dir.exists():
+            session_dir = base_storage / day_dir / domain / f"{session_name}-{suffix}"
+            suffix += 1
+
+        session_dir.mkdir(parents=True, exist_ok=False)
+        return session_dir
 
     async def capture_page(
         self,
@@ -82,15 +117,14 @@ class Pipeline:
             await self._browser.ensure_connected(target_url=target_url)
             current_url = await self._browser.get_current_url()
             domain = BrowserConnector.extract_domain(current_url)
-            timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+            captured_at = datetime.now(timezone.utc)
 
             if storage_path:
                 base_storage = Path(storage_path)
             else:
                 base_storage = self._storage_dir
 
-            session_dir = base_storage / timestamp / domain
-            session_dir.mkdir(parents=True, exist_ok=True)
+            session_dir = self._build_session_dir(base_storage, domain, captured_at)
 
             html = await self._browser.get_document_html()
             (session_dir / "index.html").write_text(html, encoding="utf-8")
@@ -105,6 +139,7 @@ class Pipeline:
                 "source_maps": 0,
                 "chunks_indexed": 0,
                 "storage_path": str(session_dir),
+                "indexing_warning": "",
             }
 
             tasks_to_parse: list[dict[str, str]] = []
@@ -186,6 +221,7 @@ class Pipeline:
                             "path": str(local_path),
                             "mapPath": map_path or "",
                             "url": src_url,
+                            "fileHash": file_hash,
                         }
                     )
                     stats["new_files"] += 1
@@ -193,13 +229,25 @@ class Pipeline:
             await asyncio.gather(*[process_script(s) for s in scripts])
 
             if tasks_to_parse:
-                chunks_indexed = await self._parse_and_index(tasks_to_parse, domain)
-                stats["chunks_indexed"] = chunks_indexed
+                embedding_reason = self.get_embedding_unavailable_reason()
+                if embedding_reason:
+                    stats["indexing_warning"] = (
+                        "未配置 Embedding，已跳过代码向量索引。"
+                        f"原因: {embedding_reason}"
+                    )
+                    logger.warning(stats["indexing_warning"])
+                else:
+                    try:
+                        chunks_indexed = await self._parse_and_index(tasks_to_parse, domain)
+                        stats["chunks_indexed"] = chunks_indexed
+                    except Exception as e:
+                        stats["indexing_warning"] = f"代码向量索引失败: {e}"
+                        logger.exception("代码向量索引失败")
 
             metadata = {
                 "url": current_url,
                 "domain": domain,
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": captured_at.isoformat(),
                 "storage_path": str(session_dir),
                 "stats": stats,
             }
@@ -226,14 +274,11 @@ class Pipeline:
 
         all_texts: list[str] = []
         all_metadata: list[dict] = []
+        file_hash_by_url = {f["url"]: f.get("fileHash", "") for f in files}
 
         for file_result in result.get("results", []):
             url = file_result.get("url", "")
-            file_hash = ""
-            for f in files:
-                if f["url"] == url:
-                    file_hash = Path(f["path"]).stem
-                    break
+            file_hash = file_hash_by_url.get(url, "")
 
             for sub_result in file_result.get("results", []):
                 original_file = sub_result.get("originalFile", "")
@@ -281,7 +326,7 @@ class Pipeline:
     async def search(
         self, query: str, domain_filter: Optional[str] = None, limit: int = 10
     ) -> list[dict]:
-        query_vector = await self._embedding.embed_query(query)
+        query_vector = await self.embedding.embed_query(query)
         results = self._index.search_vectors(
             query_vector, limit=limit, domain_filter=domain_filter
         )

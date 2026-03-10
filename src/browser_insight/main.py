@@ -41,7 +41,7 @@ async def capture_current_page(
     不指定 target_url 时，使用当前活跃标签页。
 
     Args:
-        storage_path: 文件存储的绝对路径，所有抓取的 JS 文件将归档到此目录下（按日期/域名/原始路径组织）
+        storage_path: 文件存储的绝对路径，所有抓取的 JS 文件将归档到此目录下（按日期/域名/会话时间/原始路径组织）
         target_url: 目标网页 URL，例如 "https://www.baidu.com"。会自动查找已打开的匹配标签页，找不到则新建
         force_refresh: 是否忽略哈希缓存，强制重新解析所有文件
     """
@@ -65,6 +65,8 @@ async def capture_current_page(
     if stats["source_maps"] > 0:
         parts.append(f"还原了 {stats['source_maps']} 个 Source Map")
     parts.append(f"共索引 {stats['chunks_indexed']} 个代码块")
+    if stats.get("indexing_warning"):
+        parts.append(stats["indexing_warning"])
     parts.append(f"存储路径: {stats['storage_path']}")
     return "，".join(parts) + "。"
 

@@ -1,5 +1,6 @@
 # CHANGELOG
 
+- [2026-03-10 14:52] FEAT: 新增测试环境自检与分层运行脚本，补全 integration/e2e 标准执行入口 (Files: scripts/check_test_env.py, scripts/run_tests.py, README.md, doc/TESTING.md, doc/CONTRIBUTING.md, CHANGELOG)
 - [2026-03-10 14:12] REFACTOR: 补全项目命名、测试分层与依赖兼容配置，完善 auto_js_reverse 工程化收口 (Files: pyproject.toml, uv.lock, .gitignore, README.md, doc/API.md, doc/CONTRIBUTING.md, doc/TESTING.md, src/browser_insight/main.py, src/browser_insight/__init__.py, src/browser_insight/node_worker/package.json, src/browser_insight/node_worker/package-lock.json, src/browser_insight/node_worker/processor.js, tests/test_new_tools.py, tests/test_e2e_baidu.py, tests/test_fenbi_mcp_tools.py, tests/test_pipeline_resilience.py, CHANGELOG)
 - [2026-03-10 14:03] FEAT: 按优先级修复启动阻塞、快照覆盖与索引元数据问题，并新增贡献与里程碑文档 (Files: src/browser_insight/services/pipeline.py, src/browser_insight/services/index_manager.py, src/browser_insight/main.py, tests/test_new_tools.py, tests/test_e2e_baidu.py, tests/test_pipeline_resilience.py, doc/API.md, doc/CONTRIBUTING.md, doc/MILESTONES.md, doc/ROADMAP.md, CHANGELOG)
 - [2026-03-10 13:52] REFACTOR: 将 skill 调整为面向 auto_js_reverse 项目使用的逆向分析技能，并统一项目命名 (Files: skill/auto_js_reverse/SKILL.md, skill/browser-insight-cto/SKILL.md, CHANGELOG)

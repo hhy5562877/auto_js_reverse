@@ -65,6 +65,7 @@ docs(roadmap): add project milestones and delivery phases
 - 不要让基础测试依赖 fenbi、baidu、Chrome 实例才能运行
 - 使用 `pytest` marker 区分 `unit`、`integration`、`e2e`
 - 提交前至少跑通本次改动相关的 `unit` 测试
+- 跑 `integration/e2e` 前优先使用 `scripts/check_test_env.py` 做环境检查
 
 ## 推荐分层
 

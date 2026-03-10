@@ -13,19 +13,39 @@
 ### 只跑单元测试
 
 ```bash
+python scripts/check_test_env.py --level unit
 python -m pytest -m unit
 ```
 
 ### 跑集成测试
 
 ```bash
+python scripts/check_test_env.py --level integration
 python -m pytest -m integration
 ```
 
 ### 跑端到端测试
 
 ```bash
+python scripts/check_test_env.py --level e2e
 python -m pytest -m e2e
+```
+
+## 推荐脚本入口
+
+如果你希望把环境检查和测试执行串起来，优先使用：
+
+```bash
+python scripts/run_tests.py --level unit
+python scripts/run_tests.py --level integration
+python scripts/run_tests.py --level e2e
+```
+
+传递额外 pytest 参数示例：
+
+```bash
+python scripts/run_tests.py --level unit tests/test_pipeline_resilience.py
+python scripts/run_tests.py --level integration tests/test_new_tools.py
 ```
 
 ## 当前建议
@@ -33,6 +53,7 @@ python -m pytest -m e2e
 - 日常开发优先跑 `unit`
 - 修改浏览器连接、索引、抓取流程时，再补 `integration`
 - 修改完整逆向工作流时，再跑 `e2e`
+- 在跑 `integration/e2e` 之前先执行环境自检脚本，减少无效排查
 
 ## 环境要求
 

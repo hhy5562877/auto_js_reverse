@@ -663,9 +663,20 @@ Resource 类型，列出所有已归档的域名和统计信息。
 推荐命令：
 
 ```bash
+python scripts/check_test_env.py --level unit
 python -m pytest -m unit
+python scripts/check_test_env.py --level integration
 python -m pytest -m integration
+python scripts/check_test_env.py --level e2e
 python -m pytest -m e2e
+```
+
+标准运行入口：
+
+```bash
+python scripts/run_tests.py --level unit
+python scripts/run_tests.py --level integration
+python scripts/run_tests.py --level e2e
 ```
 
 更完整的测试说明见 [doc/TESTING.md](doc/TESTING.md)。

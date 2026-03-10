@@ -194,6 +194,20 @@ class ReverseAnalyzer:
         )
         return candidates[:limit]
 
+    def collect_template_context(
+        self, focus: Optional[str] = None
+    ) -> dict[str, dict[str, object]]:
+        templates, _ = self._resolve_templates(focus)
+        context: dict[str, dict[str, object]] = {}
+        for template in templates:
+            context[template.name] = {
+                "description": template.description,
+                "header_keywords": list(template.header_keywords),
+                "hook_keywords": list(template.hook_keywords),
+                "recommended_queries": list(template.recommended_queries),
+            }
+        return context
+
     def _resolve_templates(
         self, focus: Optional[str]
     ) -> tuple[list[ReverseTemplate], Optional[str]]:

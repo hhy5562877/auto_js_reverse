@@ -29,6 +29,22 @@ pipeline = Pipeline(config=config, base_dir=BASE_DIR)
 
 mcp = FastMCP(name="auto_js_reverse")
 
+INTERESTING_REQUEST_HEADERS = (
+    "authorization",
+    "cookie",
+    "x-token",
+    "x-sign",
+    "x-signature",
+    "x-timestamp",
+    "x-nonce",
+    "content-type",
+    "referer",
+    "origin",
+)
+REQUEST_PARAM_PATTERN = re.compile(
+    r"(?i)\b(sign|signature|token|access_token|refresh_token|nonce|timestamp|password|pwd|encrypt)\b"
+)
+
 
 def _build_hook_js(function_path: str, max_calls: int) -> str:
     safe_path = function_path.replace("'", "\\'")
@@ -146,6 +162,118 @@ def _format_hook_output(function_path: str, calls: list[dict], duration: float) 
                 lines.append(f"  - `{s}`")
 
     return "\n".join(lines)
+
+
+def _extract_interesting_headers(headers: dict[str, object]) -> dict[str, object]:
+    return {
+        key: value
+        for key, value in headers.items()
+        if key.lower() in INTERESTING_REQUEST_HEADERS
+    }
+
+
+async def _capture_network_events(
+    target_url: Optional[str],
+    duration: float,
+    trigger_action: Optional[str],
+    filter_type: Optional[str],
+) -> list[dict]:
+    await pipeline._browser.ensure_connected(target_url=target_url)
+
+    async def _trigger() -> None:
+        await asyncio.sleep(0.3)
+        if trigger_action:
+            try:
+                await pipeline._browser.evaluate(trigger_action)
+            except Exception as e:
+                logger.warning("trigger_action 执行失败: %s", e)
+        else:
+            try:
+                await pipeline._browser.evaluate("location.reload()")
+            except Exception:
+                pass
+
+    asyncio.create_task(_trigger())
+    events = await pipeline._browser.collect_network_events(duration_sec=duration)
+    if filter_type:
+        events = [e for e in events if e.get("type", "").lower() == filter_type.lower()]
+    return events
+
+
+def _extract_request_keywords(event: dict) -> list[str]:
+    blob_parts = [
+        str(event.get("url", "")),
+        str(event.get("postData", "")),
+    ]
+    blob_parts.extend(str(key) for key in (event.get("headers", {}) or {}).keys())
+    blob = "\n".join(blob_parts)
+    keywords = []
+    for match in REQUEST_PARAM_PATTERN.findall(blob):
+        normalized = str(match).lower()
+        if normalized not in keywords:
+            keywords.append(normalized)
+    return keywords
+
+
+def _score_network_event(
+    event: dict,
+    candidates: list[dict],
+    template_context: dict[str, dict[str, object]],
+) -> dict:
+    interesting_headers = _extract_interesting_headers(event.get("headers", {}) or {})
+    header_names = [name.lower() for name in interesting_headers.keys()]
+    keywords = _extract_request_keywords(event)
+    url_text = str(event.get("url", "")).lower()
+    post_text = str(event.get("postData", "")).lower()
+
+    matched_candidates = []
+    for candidate in candidates:
+        candidate_headers = [str(item).lower() for item in candidate.get("headers", [])]
+        candidate_focuses = [str(item).lower() for item in candidate.get("focuses", [])]
+        overlap_headers = [name for name in header_names if name in candidate_headers]
+        overlap_focuses = [focus for focus in candidate_focuses if focus in keywords or focus in url_text or focus in post_text]
+        if overlap_headers or overlap_focuses:
+            matched_candidates.append(
+                {
+                    "target": candidate["target"],
+                    "focuses": candidate_focuses,
+                    "header_overlap": overlap_headers,
+                    "focus_overlap": overlap_focuses,
+                    "score": len(overlap_headers) * 3 + len(overlap_focuses) * 2 + int(candidate.get("score", 0)),
+                }
+            )
+
+    matched_candidates.sort(key=lambda item: item["score"], reverse=True)
+
+    matched_focuses = []
+    for focus_name, context in template_context.items():
+        header_keywords = [str(item).lower() for item in context.get("header_keywords", [])]
+        hook_keywords = [str(item).lower() for item in context.get("hook_keywords", [])]
+        header_overlap = [name for name in header_names if name in header_keywords]
+        keyword_overlap = [name for name in keywords if name in hook_keywords or name == focus_name]
+        if header_overlap or keyword_overlap:
+            matched_focuses.append(
+                {
+                    "focus": focus_name,
+                    "header_overlap": header_overlap,
+                    "keyword_overlap": keyword_overlap,
+                }
+            )
+
+    score = len(header_names) * 2 + len(keywords)
+    if event.get("type", "").lower() in {"xhr", "fetch"}:
+        score += 2
+    score += len(matched_candidates) * 3
+    score += len(matched_focuses) * 2
+
+    return {
+        "event": event,
+        "interesting_headers": interesting_headers,
+        "keywords": keywords,
+        "matched_candidates": matched_candidates[:3],
+        "matched_focuses": matched_focuses,
+        "score": score,
+    }
 
 
 @mcp.tool
@@ -393,28 +521,14 @@ async def capture_network_requests(
         filter_type: 过滤请求类型，可选 "XHR"、"Fetch"、"Script"。不填则捕获所有类型
     """
     try:
-        await pipeline._browser.ensure_connected(target_url=target_url)
-
-        async def _trigger():
-            await asyncio.sleep(0.3)
-            if trigger_action:
-                try:
-                    await pipeline._browser.evaluate(trigger_action)
-                except Exception as e:
-                    logger.warning("trigger_action 执行失败: %s", e)
-            else:
-                try:
-                    await pipeline._browser.evaluate("location.reload()")
-                except Exception:
-                    pass
-
-        asyncio.create_task(_trigger())
-        events = await pipeline._browser.collect_network_events(duration_sec=duration)
+        events = await _capture_network_events(
+            target_url=target_url,
+            duration=duration,
+            trigger_action=trigger_action,
+            filter_type=filter_type,
+        )
     except Exception as e:
         return f"❌ 网络监听失败: {e}"
-
-    if filter_type:
-        events = [e for e in events if e.get("type", "").lower() == filter_type.lower()]
 
     if not events:
         return f"在 {duration} 秒内未捕获到网络请求。尝试在页面上触发操作后重新监听。"
@@ -436,23 +550,7 @@ async def capture_network_requests(
             lines.append(f"- POST 数据:\n```\n{post}\n```")
 
         req_headers = evt.get("headers", {})
-        interesting = {
-            k: v
-            for k, v in req_headers.items()
-            if k.lower()
-            in (
-                "authorization",
-                "cookie",
-                "x-token",
-                "x-sign",
-                "x-signature",
-                "x-timestamp",
-                "x-nonce",
-                "content-type",
-                "referer",
-                "origin",
-            )
-        }
+        interesting = _extract_interesting_headers(req_headers)
         if interesting:
             lines.append("- 关键请求头:")
             for k, v in interesting.items():
@@ -690,6 +788,113 @@ async def auto_probe_hook_candidates(
         lines.append(
             "\n未命中任何候选入口。建议提供更具体的 trigger_action，或先用 "
             "capture_network_requests 确认触发链路。"
+        )
+
+    return "\n".join(lines)
+
+
+@mcp.tool
+async def correlate_request_flow(
+    domain_filter: Optional[str] = None,
+    focus: Optional[str] = None,
+    target_url: Optional[str] = None,
+    trigger_action: Optional[str] = None,
+    duration: float = 10.0,
+    filter_type: Optional[str] = "XHR",
+    max_requests: int = 5,
+    max_candidates: int = 5,
+) -> str:
+    """抓取网络请求并和本地代码线索自动对齐，输出更值得继续分析的请求与 Hook 入口。
+
+    Args:
+        domain_filter: 限制代码线索扫描的域名
+        focus: 指定专题，可选 sign、token、encrypt、headers
+        target_url: 目标页面 URL（可选）
+        trigger_action: 抓包开始后自动执行的 JS，用于触发请求
+        duration: 抓包时长（秒）
+        filter_type: 过滤请求类型，默认 `XHR`
+        max_requests: 最多输出多少个高优先级请求
+        max_candidates: 最多读取多少个 Hook 候选函数参与关联
+    """
+    try:
+        analyzer = ReverseAnalyzer(pipeline.index)
+        candidates = analyzer.collect_hook_candidates(
+            domain_filter=domain_filter,
+            focus=focus,
+            limit=max_candidates,
+        )
+        template_context = analyzer.collect_template_context(focus=focus)
+    except ValueError as e:
+        return f"❌ 参数错误: {e}"
+    except Exception as e:
+        logger.exception("correlate_request_flow 分析候选失败")
+        return f"❌ 请求流分析失败: {e}"
+
+    try:
+        events = await _capture_network_events(
+            target_url=target_url,
+            duration=duration,
+            trigger_action=trigger_action,
+            filter_type=filter_type,
+        )
+    except Exception as e:
+        return f"❌ 网络监听失败: {e}"
+
+    if not events:
+        return f"在 {duration} 秒内未捕获到网络请求。尝试调整 trigger_action 后重试。"
+
+    ranked = [
+        _score_network_event(
+            event=event,
+            candidates=candidates,
+            template_context=template_context,
+        )
+        for event in events
+    ]
+    ranked.sort(key=lambda item: item["score"], reverse=True)
+    ranked = ranked[:max_requests]
+
+    lines = [
+        f"🕸️ 请求流关联分析 (共捕获 {len(events)} 个请求，展示前 {len(ranked)} 个)\n",
+        f"- 范围: `{domain_filter}`" if domain_filter else "- 范围: 全部域名",
+        f"- 专题: `{focus}`" if focus else "- 专题: 自动",
+        f"- 过滤类型: `{filter_type}`" if filter_type else "- 过滤类型: 全部",
+    ]
+
+    for idx, item in enumerate(ranked, 1):
+        event = item["event"]
+        response = event.get("response") or {}
+        lines.append(
+            f"\n## 请求 {idx}\n"
+            f"- **{event.get('method', '?')}** `{event.get('url', '')}`\n"
+            f"- 类型: {event.get('type', '?')} | 状态: {response.get('status', '-')}\n"
+            f"- 关键字: {', '.join(f'`{keyword}`' for keyword in item['keywords']) if item['keywords'] else '无'}"
+        )
+        if item["interesting_headers"]:
+            lines.append("- 关键请求头:")
+            for key, value in item["interesting_headers"].items():
+                lines.append(f"  - `{key}`: `{value}`")
+        if event.get("postData"):
+            post = str(event["postData"])
+            if len(post) > 1000:
+                post = post[:1000] + "...(截断)"
+            lines.append(f"- POST 数据:\n```\n{post}\n```")
+        if item["matched_focuses"]:
+            lines.append("- 命中的专题线索:")
+            for matched in item["matched_focuses"]:
+                overlap = matched["header_overlap"] + matched["keyword_overlap"]
+                summary = ", ".join(f"`{value}`" for value in overlap) if overlap else "无"
+                lines.append(f"  - `{matched['focus']}`: {summary}")
+        if item["matched_candidates"]:
+            lines.append("- 建议优先 Hook:")
+            for candidate in item["matched_candidates"]:
+                overlaps = candidate["header_overlap"] + candidate["focus_overlap"]
+                overlap_text = ", ".join(f"`{value}`" for value in overlaps) if overlaps else "无"
+                lines.append(f"  - `{candidate['target']}` ({overlap_text})")
+
+    if not any(item["matched_candidates"] for item in ranked):
+        lines.append(
+            "\n未找到和请求头明显对齐的 Hook 候选。建议先执行 analyze_reverse_targets 查看代码侧线索。"
         )
 
     return "\n".join(lines)

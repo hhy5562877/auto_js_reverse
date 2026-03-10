@@ -607,6 +607,112 @@ def test_auto_probe_hook_candidates() -> bool:
         shutil.rmtree(tmp_db, ignore_errors=True)
 
 
+@pytest.mark.unit
+def test_correlate_request_flow() -> bool:
+    """测试请求流与代码线索自动对齐"""
+    tmp_db = tempfile.mkdtemp(prefix="mcp_test_request_flow_")
+    try:
+        idx = IndexManager(tmp_db)
+        fake_vector = [0.1] * 1024
+        idx.add_code_chunks([
+            {
+                "vector": fake_vector,
+                "text": "window.getSign = function(body, ts, nonce) { return md5(body + ts + nonce + secret); };",
+                "original_file": "sign.js",
+                "url": "https://test.com/sign.js",
+                "domain": "test.com",
+                "line_start": 1,
+                "line_end": 1,
+                "source_map_restored": True,
+                "file_hash": "d1",
+            },
+            {
+                "vector": fake_vector,
+                "text": "function attachHeaders(cfg) { cfg.headers['x-sign'] = window.getSign(cfg.data, cfg.headers['x-timestamp'], cfg.headers['x-nonce']); cfg.headers.Authorization = 'Bearer ' + token; return cfg; }",
+                "original_file": "request.js",
+                "url": "https://test.com/request.js",
+                "domain": "test.com",
+                "line_start": 10,
+                "line_end": 12,
+                "source_map_restored": True,
+                "file_hash": "d2",
+            },
+        ])
+
+        class BrowserStub:
+            async def ensure_connected(self, target_url: str = None) -> None:
+                return None
+
+            async def evaluate(self, expression: str):
+                if expression == "window.login()":
+                    return None
+                if expression == "location.reload()":
+                    return None
+                raise AssertionError(f"收到未预期的表达式: {expression}")
+
+            async def collect_network_events(self, duration_sec: float) -> list[dict]:
+                return [
+                    {
+                        "url": "https://api.test.com/login",
+                        "method": "POST",
+                        "headers": {
+                            "x-sign": "abc123",
+                            "x-timestamp": "1700000000",
+                            "x-nonce": "nonce-1",
+                            "Authorization": "Bearer token-1",
+                            "content-type": "application/json",
+                        },
+                        "postData": '{"username":"alice","password":"secret"}',
+                        "type": "XHR",
+                        "initiator": "script",
+                        "response": {"status": 200},
+                    },
+                    {
+                        "url": "https://api.test.com/profile",
+                        "method": "GET",
+                        "headers": {"content-type": "application/json"},
+                        "postData": "",
+                        "type": "XHR",
+                        "initiator": "script",
+                        "response": {"status": 200},
+                    },
+                ]
+
+        class PipelineStub:
+            def __init__(self, index: IndexManager):
+                self.index = index
+                self._browser = BrowserStub()
+
+        import browser_insight.main as main_mod
+
+        original_pipeline = main_mod.pipeline
+        main_mod.pipeline = PipelineStub(idx)
+        try:
+            result = asyncio.run(
+                main_mod.correlate_request_flow.fn(
+                    domain_filter="test.com",
+                    focus="sign",
+                    trigger_action="window.login()",
+                    duration=0.1,
+                    max_requests=2,
+                    max_candidates=3,
+                )
+            )
+        finally:
+            main_mod.pipeline = original_pipeline
+
+        assert "请求流关联分析" in result
+        assert "https://api.test.com/login" in result
+        assert "`x-sign`" in result
+        assert "`window.getSign`" in result
+        assert "`password`" in result
+
+        logger.info("%s correlate_request_flow (请求与代码线索对齐)", PASS)
+        return True
+    finally:
+        shutil.rmtree(tmp_db, ignore_errors=True)
+
+
 def main():
     logger.info("=" * 60)
     logger.info("auto_js_reverse 新工具测试")
@@ -632,14 +738,17 @@ def main():
     logger.info("\n--- 6/7 hook_function ---")
     results["hook_function"] = test_hook_function()
 
-    logger.info("\n--- 7/9 analyze_encryption ---")
+    logger.info("\n--- 7/10 analyze_encryption ---")
     results["analyze_encryption"] = test_analyze_encryption()
 
-    logger.info("\n--- 8/9 analyze_reverse_targets ---")
+    logger.info("\n--- 8/10 analyze_reverse_targets ---")
     results["analyze_reverse_targets"] = test_analyze_reverse_targets()
 
-    logger.info("\n--- 9/9 auto_probe_hook_candidates ---")
+    logger.info("\n--- 9/10 auto_probe_hook_candidates ---")
     results["auto_probe_hook_candidates"] = test_auto_probe_hook_candidates()
+
+    logger.info("\n--- 10/10 correlate_request_flow ---")
+    results["correlate_request_flow"] = test_correlate_request_flow()
 
     logger.info("\n" + "=" * 60)
     logger.info("测试结果汇总:")

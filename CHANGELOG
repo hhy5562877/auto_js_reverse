@@ -1,5 +1,6 @@
 # CHANGELOG
 
+- [2026-03-10 16:03] FEAT: 新增请求流关联分析工具，自动将网络请求与 sign/token/encrypt/headers 代码线索对齐 (Files: src/browser_insight/services/reverse_analyzer.py, src/browser_insight/main.py, tests/test_new_tools.py, doc/API.md, CHANGELOG)
 - [2026-03-10 15:52] FEAT: 新增自动候选 Hook 试探工具，支持按专题批量验证 sign/token/encrypt/headers 入口 (Files: src/browser_insight/services/reverse_analyzer.py, src/browser_insight/main.py, tests/test_new_tools.py, doc/API.md, CHANGELOG)
 - [2026-03-10 15:40] FEAT: 新增逆向专题分析工具，按 sign/token/encrypt/headers 提炼 Hook 入口与请求头线索 (Files: src/browser_insight/services/reverse_analyzer.py, src/browser_insight/main.py, tests/test_new_tools.py, doc/API.md, CHANGELOG)
 - [2026-03-10 15:32] FEAT: 补充全量分层测试脚本入口，支持一条命令顺序执行 unit/integration/e2e (Files: scripts/run_tests.py, README.md, doc/TESTING.md, CHANGELOG)
